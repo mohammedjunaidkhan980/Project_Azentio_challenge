@@ -186,3 +186,7 @@ All endpoints are under `/api/v1`.
 - Generic `401` messages prevent user enumeration.
 - All protected endpoints deny access by default.
 - Database credentials are never hardcoded — always read from `.env`.
+
+## Frontend integration
+
+See frontend/README.md. The backend layout is preserved at repository root. Use existing Alembic upgrades; do not autogenerate a new initial revision for an existing database. Frontend uses a loopback Vite proxy for /api requests. MySQL credentials and real admin provisioning are not bundled.

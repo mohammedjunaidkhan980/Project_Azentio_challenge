@@ -1,0 +1,31 @@
+import { api, pageQuery } from './client'
+import type { DecisionInput, EnquiryInput, EntitlementInput, ImprovementInput, ObservationInput, ProductInput } from './types'
+const id = encodeURIComponent
+export const services = {
+  health: () => api.request('/health', { auth: false }),
+  me: (signal?: AbortSignal) => api.request('/auth/me', { signal }),
+  products: (page = 1, signal?: AbortSignal) => api.request('/products' + pageQuery(page), { auth: false, signal }),
+  product: (key: string, signal?: AbortSignal) => api.request(`/products/${id(key)}`, { auth: false, signal }),
+  createProduct: (body: ProductInput) => api.request('/products', { method: 'POST', body }),
+  updateProduct: (key: string, body: Partial<ProductInput>) => api.request(`/products/${id(key)}`, { method: 'PATCH', body }),
+  unpublishProduct: (key: string) => api.request(`/products/${id(key)}`, { method: 'DELETE' }),
+  enquire: (body: EnquiryInput) => api.request('/demo-enquiries', { method: 'POST', body, auth: false }),
+  enquiries: (page = 1, signal?: AbortSignal) => api.request('/demo-enquiries' + pageQuery(page), { signal }),
+  enquiry: (key: string, signal?: AbortSignal) => api.request(`/demo-enquiries/${id(key)}`, { signal }),
+  enquiryStatus: (key: string, status: string) => api.request(`/demo-enquiries/${id(key)}/status`, { method: 'PATCH', body: { status } }),
+  observations: (organisation: string, page = 1, signal?: AbortSignal) => api.request('/observations' + pageQuery(page, { organisation_id: organisation }), { signal }),
+  observation: (key: string, signal?: AbortSignal) => api.request(`/observations/${id(key)}`, { signal }),
+  createObservation: (body: ObservationInput) => api.request('/observations', { method: 'POST', body }),
+  consent: (key: string, grant: boolean, reason: string) => api.request(`/observations/${id(key)}/consent`, { method: grant ? 'POST' : 'DELETE', body: { reason } }),
+  queue: (page = 1, signal?: AbortSignal) => api.request('/moderation/observations' + pageQuery(page), { signal }),
+  decide: (key: string, body: DecisionInput) => api.request(`/moderation/observations/${id(key)}/decision`, { method: 'POST', body }),
+  publish: (key: string) => api.request(`/moderation/observations/${id(key)}/publish`, { method: 'POST' }),
+  learning: (page = 1, product = '', signal?: AbortSignal) => api.request('/shared-learning' + pageQuery(page, product ? { product_id: product } : {}), { signal }),
+  shared: (key: string, signal?: AbortSignal) => api.request(`/shared-learning/${id(key)}`, { signal }),
+  unpublish: (key: string, reason: string) => api.request(`/shared-learning/${id(key)}?${new URLSearchParams({ reason })}`, { method: 'DELETE' }),
+  entitlement: (body: EntitlementInput) => api.request('/entitlements/product', { method: 'POST', body }),
+  improvements: (page = 1, product = '', signal?: AbortSignal) => api.request('/product-improvements' + pageQuery(page, product ? { product_id: product } : {}), { signal }),
+  createImprovement: (body: ImprovementInput) => api.request('/product-improvements', { method: 'POST', body }),
+  improvementStatus: (key: string, status: string, reason: string) => api.request(`/product-improvements/${id(key)}/status`, { method: 'PATCH', body: { status, reason } }),
+  audit: (page = 1, signal?: AbortSignal) => api.request('/audit-events' + pageQuery(page), { signal }),
+}
