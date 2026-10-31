@@ -57,6 +57,29 @@ VALID_PAYLOAD = {
 }
 
 
+@pytest.mark.parametrize("method", ["POST", "DELETE"])
+@pytest.mark.asyncio
+async def test_consent_requires_author_even_with_same_tenant_membership(
+    client: AsyncClient, db_session: AsyncSession, method: str
+):
+    author, org = await _seed_user(db_session, RoleEnum.CLIENT, "author@example.com")
+    peer, _ = await _seed_user(db_session, RoleEnum.CLIENT, "peer@example.com")
+    db_session.add(OrganisationMembership(user_id=peer.id, organisation_id=org.id,
+        role=RoleEnum.CLIENT, is_active=True))
+    await db_session.commit()
+    await db_session.refresh(peer, attribute_names=["memberships"])
+    created = await client.post("/api/v1/observations", headers=_auth(author),
+        json={**VALID_PAYLOAD, "organisation_id": str(org.id)})
+    oid = created.json()["data"]["id"]
+    route = f"/api/v1/observations/{oid}/consent"
+    if method == "DELETE":
+        assert (await client.post(route, headers=_auth(author), json={})).status_code == 200
+    response = await client.request(method, route, headers=_auth(peer), json={})
+    assert response.status_code == 403
+    saved = await client.get(f"/api/v1/observations/{oid}", headers=_auth(author))
+    assert saved.json()["data"]["consent_status"] == ("granted" if method == "DELETE" else "not_granted")
+
+
 @pytest.mark.asyncio
 async def test_observation_endpoints_require_authentication(client: AsyncClient):
     response = await client.post(

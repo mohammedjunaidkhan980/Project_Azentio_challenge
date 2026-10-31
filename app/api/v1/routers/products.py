@@ -14,7 +14,7 @@ from app.services.product_service import ProductService
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
-_admin_or_employee = require_roles(RoleEnum.ADMIN, RoleEnum.EMPLOYEE)
+_catalogue_admin = require_roles(RoleEnum.ADMIN)
 
 
 @router.get("", response_model=SuccessResponse[list[ProductOut]])
@@ -37,7 +37,7 @@ async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db))
 async def create_product(
     body: ProductCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[User, Depends(_admin_or_employee)],
+    _: Annotated[User, Depends(_catalogue_admin)],
 ):
     product = await ProductService(db).create(body)
     return SuccessResponse(message="Product created", data=product)
@@ -48,7 +48,7 @@ async def update_product(
     product_id: uuid.UUID,
     body: ProductUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[User, Depends(_admin_or_employee)],
+    _: Annotated[User, Depends(_catalogue_admin)],
 ):
     product = await ProductService(db).update(product_id, body)
     return SuccessResponse(message="Product updated", data=product)
@@ -58,7 +58,7 @@ async def update_product(
 async def deactivate_product(
     product_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[User, Depends(_admin_or_employee)],
+    _: Annotated[User, Depends(_catalogue_admin)],
 ):
     product = await ProductService(db).deactivate(product_id)
     return SuccessResponse(message="Product deactivated", data=product)

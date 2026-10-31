@@ -22,6 +22,7 @@ from app.models.phase4 import (
 from app.models.organisation import Organisation
 from app.models.product import Product
 from app.models.user import User
+from app.core.config import settings
 from app.schemas.common import PaginationMeta
 from app.schemas.phase4 import (
     ImprovementEvidenceOut,
@@ -49,6 +50,7 @@ def _active_memberships(user: User, role: RoleEnum) -> list:
     return [
         membership for membership in user.memberships
         if membership.is_active and membership.role == role
+        and membership.organisation is not None and membership.organisation.is_active
     ]
 
 
@@ -57,15 +59,24 @@ class Phase4Service:
         self.db = db
 
     def _require_moderator(self, user: User) -> None:
-        if not _active_memberships(user, RoleEnum.MODERATOR) and not _active_memberships(user, RoleEnum.ADMIN):
+        if not _active_memberships(user, RoleEnum.MODERATOR):
             raise _http("FORBIDDEN", "Insufficient permissions", 403)
 
     def _require_product_owner(self, user: User, organisation_id: uuid.UUID | None = None) -> None:
-        if _active_memberships(user, RoleEnum.ADMIN):
-            return
         owners = _active_memberships(user, RoleEnum.PRODUCT_OWNER)
         if not owners or (organisation_id is not None and organisation_id not in {m.organisation_id for m in owners}):
             raise _http("FORBIDDEN", "Insufficient permissions", 403)
+
+    async def _require_owner_product(self, user: User, product_id: uuid.UUID, organisation_id: uuid.UUID | None):
+        org_ids = {m.organisation_id for m in _active_memberships(user, RoleEnum.PRODUCT_OWNER)
+                   if organisation_id is None or m.organisation_id == organisation_id}
+        entitled = await self.db.scalar(select(OrganisationProductEntitlement.id).where(
+            OrganisationProductEntitlement.organisation_id.in_(org_ids),
+            OrganisationProductEntitlement.product_id == product_id,
+            OrganisationProductEntitlement.is_active.is_(True),
+        ).limit(1))
+        if entitled is None:
+            raise _http("FORBIDDEN", "Product entitlement is required", 403)
 
     def _audit(
         self,
@@ -210,7 +221,8 @@ class Phase4Service:
             observation_id=observation.id,
             source_organisation_id=observation.organisation_id,
             product_id=observation.product_id,
-            category=observation.category,
+            # Source category is unreviewed free text, not approved metadata.
+            category=None,
             redacted_title=review.redacted_title,
             redacted_content=review.redacted_content,
             status=SharedLearningStatusEnum.PUBLISHED,
@@ -228,7 +240,6 @@ class Phase4Service:
         return entry
 
     async def create_entitlement(self, user: User, organisation_id: uuid.UUID, product_id: uuid.UUID, is_active: bool):
-        self._require_moderator(user)
         if not _active_memberships(user, RoleEnum.ADMIN):
             raise _http("FORBIDDEN", "Only administrators can manage product entitlements", 403)
         product_result = await self.db.execute(select(Product.id).where(Product.id == product_id))
@@ -271,17 +282,17 @@ class Phase4Service:
         await self.db.refresh(entitlement)
         return entitlement
 
-    async def _client_org_ids(self, user: User) -> list[uuid.UUID]:
+    async def _learning_org_ids(self, user: User) -> list[uuid.UUID]:
         return [
             m.organisation_id for m in user.memberships
             if m.is_active
-            and m.role == RoleEnum.CLIENT
+            and m.role in {RoleEnum.CLIENT, RoleEnum.PRODUCT_OWNER}
             and m.organisation is not None
             and m.organisation.is_active
         ]
 
     async def _shared_entry_is_entitled(self, user: User, entry: SharedLearningEntry) -> bool:
-        org_ids = await self._client_org_ids(user)
+        org_ids = await self._learning_org_ids(user)
         if not org_ids:
             return False
         if entry.product_id is None:
@@ -293,6 +304,7 @@ class Phase4Service:
                 OrganisationProductEntitlement.product_id == entry.product_id,
                 OrganisationProductEntitlement.is_active.is_(True),
             )
+            .limit(1)
         )
         return result.scalar_one_or_none() is not None
 
@@ -300,7 +312,8 @@ class Phase4Service:
         return {
             "id": entry.id,
             "product_id": entry.product_id,
-            "category": entry.category,
+            # Legacy entries can contain unreviewed source category text.
+            "category": None,
             "title": entry.redacted_title,
             "content": entry.redacted_content,
             "status": entry.status,
@@ -309,13 +322,16 @@ class Phase4Service:
         }
 
     async def list_shared(
-        self, user: User, product_id: uuid.UUID | None, page: int, page_size: int
+        self, user: User, product_id: uuid.UUID | None, page: int, page_size: int, q: str = ""
     ) -> tuple[list[dict], PaginationMeta]:
-        org_ids = await self._client_org_ids(user)
+        org_ids = await self._learning_org_ids(user)
         if not org_ids:
             raise _http("FORBIDDEN", "Insufficient permissions", 403)
-        query = select(SharedLearningEntry).where(
-            SharedLearningEntry.status == SharedLearningStatusEnum.PUBLISHED
+        query = select(SharedLearningEntry).join(
+            Observation, Observation.id == SharedLearningEntry.observation_id
+        ).where(
+            SharedLearningEntry.status == SharedLearningStatusEnum.PUBLISHED,
+            Observation.consent_status == ConsentStatusEnum.GRANTED,
         )
         entitled_product_ids = select(OrganisationProductEntitlement.product_id).where(
             OrganisationProductEntitlement.organisation_id.in_(org_ids),
@@ -327,6 +343,11 @@ class Phase4Service:
         )
         if product_id is not None:
             query = query.where(SharedLearningEntry.product_id == product_id)
+        if q.strip():
+            query = query.where(
+                SharedLearningEntry.redacted_title.icontains(q.strip(), autoescape=True)
+                | SharedLearningEntry.redacted_content.icontains(q.strip(), autoescape=True)
+            )
         count_result = await self.db.execute(select(func.count()).select_from(query.subquery()))
         total = count_result.scalar_one()
         result = await self.db.execute(
@@ -343,6 +364,53 @@ class Phase4Service:
             total_pages=max(1, -(-total // page_size)),
         )
         return output, meta
+
+    async def list_themes(self, user: User, product_id: uuid.UUID | None = None) -> list[dict]:
+        """Deterministic grouping of approved copies only; never return source IDs.
+
+        Threshold applies to distinct organisations, never post volume. No small
+        cohort totals, fine-grained filters, private text or model training.
+        """
+        memberships = _active_memberships(user, RoleEnum.CLIENT) + _active_memberships(user, RoleEnum.PRODUCT_OWNER)
+        org_ids = {m.organisation_id for m in memberships}
+        if not org_ids:
+            raise _http("FORBIDDEN", "Insufficient permissions", 403)
+        entitled = select(OrganisationProductEntitlement.product_id).where(
+            OrganisationProductEntitlement.organisation_id.in_(org_ids),
+            OrganisationProductEntitlement.is_active.is_(True),
+        )
+        query = select(SharedLearningEntry).join(
+            Observation, Observation.id == SharedLearningEntry.observation_id
+        ).join(Organisation, Organisation.id == SharedLearningEntry.source_organisation_id).where(
+            SharedLearningEntry.status == SharedLearningStatusEnum.PUBLISHED,
+            Observation.consent_status == ConsentStatusEnum.GRANTED,
+            Organisation.is_active.is_(True),
+            SharedLearningEntry.product_id.is_(None) | SharedLearningEntry.product_id.in_(entitled),
+        )
+        if product_id is not None:
+            query = query.where(SharedLearningEntry.product_id == product_id)
+        entries = (await self.db.execute(query.order_by(SharedLearningEntry.published_at.desc()))).scalars().all()
+        groups = {}
+        for entry in entries:
+            approved_text = (entry.redacted_title + " " + entry.redacted_content).lower()
+            topic = "Seasonality context" if "season" in approved_text else "Operational observations"
+            groups.setdefault((entry.product_id, topic), []).append(entry)
+        output = []
+        for (product, topic), evidence in groups.items():
+            distinct = len({e.source_organisation_id for e in evidence})
+            if distinct < settings.THEME_MIN_ORGANISATIONS:
+                continue
+            output.append({
+                "id": f"{product or 'general'}:{topic}", "title": topic,
+                "product_id": product, "distinct_organisations": distinct,
+                "limitations": "Limited synthetic evidence. This count is not market prevalence or proof of causation.",
+                "method": "Deterministic keyword grouping of approved shared copies; no AI or training.",
+                "publication_window_start": min(e.published_at for e in evidence),
+                "publication_window_end": max(e.published_at for e in evidence),
+                "updated_at": max(e.updated_at for e in evidence),
+                "supporting_contributions": [{"id": e.id, "title": e.redacted_title} for e in evidence[:20]],
+            })
+        return output
 
     async def get_shared(self, user: User, entry_id: uuid.UUID) -> dict:
         result = await self.db.execute(
@@ -393,6 +461,7 @@ class Phase4Service:
         if not product_result.scalar_one_or_none():
             raise _http("PRODUCT_NOT_FOUND", "Product not found", 404)
         evidence_entries = []
+        await self._require_owner_product(user, body.product_id, body.organisation_id)
         for entry_id in body.evidence_entry_ids:
             result = await self.db.execute(
                 select(SharedLearningEntry).where(
@@ -447,17 +516,24 @@ class Phase4Service:
         query = select(ProductImprovement)
         if product_id is not None:
             query = query.where(ProductImprovement.product_id == product_id)
-        restricted_roles = {RoleEnum.ADMIN, RoleEnum.MODERATOR, RoleEnum.PRODUCT_OWNER, RoleEnum.EMPLOYEE}
-        user_roles = {m.role for m in user.memberships if m.is_active}
-        if not user_roles.intersection(restricted_roles):
-            org_ids = {m.organisation_id for m in user.memberships if m.is_active and m.role == RoleEnum.CLIENT}
-            if org_ids:
-                query = query.where(
-                    (ProductImprovement.organisation_id.is_(None))
-                    | (ProductImprovement.organisation_id.in_(org_ids))
-                )
-            else:
-                query = query.where(ProductImprovement.id == uuid.UUID(int=0))
+        clients = _active_memberships(user, RoleEnum.CLIENT)
+        owners = _active_memberships(user, RoleEnum.PRODUCT_OWNER)
+        org_ids = {m.organisation_id for m in clients + owners}
+        entitled_product = select(OrganisationProductEntitlement.id).where(
+            OrganisationProductEntitlement.product_id == ProductImprovement.product_id,
+            OrganisationProductEntitlement.is_active.is_(True),
+            (OrganisationProductEntitlement.organisation_id == ProductImprovement.organisation_id)
+            | (ProductImprovement.organisation_id.is_(None)
+               & OrganisationProductEntitlement.organisation_id.in_(org_ids)),
+        ).exists()
+        # Staff titles alone never grant access to another client's improvement.
+        query = query.where(
+            (ProductImprovement.organisation_id.in_(org_ids))
+            | ((ProductImprovement.organisation_id.is_(None))
+               & (ProductImprovement.created_by_user_id == user.id)
+               & bool(owners)),
+            entitled_product,
+        )
         count_result = await self.db.execute(select(func.count()).select_from(query.subquery()))
         total = count_result.scalar_one()
         result = await self.db.execute(
@@ -498,7 +574,10 @@ class Phase4Service:
             item = {
                 "id": improvement.id,
                 "title": improvement.title,
-                "description": improvement.description,
+                "description": improvement.description if (
+                    improvement.organisation_id in {m.organisation_id for m in owners}
+                    or (improvement.organisation_id is None and improvement.created_by_user_id == user.id and owners)
+                ) else "",
                 "product_id": improvement.product_id,
                 "organisation_id": improvement.organisation_id,
                 "status": improvement.status,
@@ -524,6 +603,7 @@ class Phase4Service:
         if not improvement:
             raise _http("IMPROVEMENT_NOT_FOUND", "Product improvement not found", 404)
         self._require_product_owner(user, improvement.organisation_id)
+        await self._require_owner_product(user, improvement.product_id, improvement.organisation_id)
         allowed = VALID_IMPROVEMENT_TRANSITIONS.get(improvement.status, set())
         if new_status not in allowed:
             raise _http(
@@ -544,7 +624,8 @@ class Phase4Service:
         return improvement
 
     async def list_audit(self, user: User, page: int, page_size: int):
-        self._require_moderator(user)
+        if not (_active_memberships(user, RoleEnum.ADMIN) or _active_memberships(user, RoleEnum.MODERATOR)):
+            raise _http("FORBIDDEN", "Insufficient permissions", 403)
         count_result = await self.db.execute(select(func.count()).select_from(AuditEvent))
         total = count_result.scalar_one()
         result = await self.db.execute(
