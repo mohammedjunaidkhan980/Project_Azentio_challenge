@@ -25,7 +25,7 @@ export function Field({ name, label, type = 'text', required = true, maxLength, 
   const identifier = useId()
   return <div className="field"><label htmlFor={identifier}>{label}{!required && <span> (optional)</span>}</label>{children ? <select id={identifier} name={name} required={required} defaultValue={value}>{children}</select> : type === 'textarea' ? <textarea id={identifier} name={name} required={required} minLength={minLength} maxLength={maxLength} defaultValue={value} rows={4} /> : <input id={identifier} name={name} type={type} required={required} maxLength={maxLength} minLength={minLength} defaultValue={value} autoComplete={type === 'password' ? 'current-password' : 'off'} />}</div>
 }
-export function ApiForm({ children, label, onSave, onDone }: { children: ReactNode; label: string; onSave: (values: FormData) => Promise<unknown>; onDone?: () => void }) {
+export function ApiForm({ children, label, onSave, onDone, successMessage }: { children: ReactNode; label: string; onSave: (values: FormData) => Promise<unknown>; onDone?: () => void; successMessage?: string }) {
   const [pending, setPending] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(false)
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); if (pending) return
@@ -35,7 +35,7 @@ export function ApiForm({ children, label, onSave, onDone }: { children: ReactNo
     catch (e) { setError((e as Error).message) }
     finally { setPending(false) }
   }
-  return <form className="form-panel api-form" onSubmit={submit}>{children}{error && <Notice error>{error}</Notice>}{success && <Notice>The API acknowledged this action. Refresh the relevant view to see its current state.</Notice>}<button type="submit" className="button button-primary mt-6" disabled={pending}>{pending ? 'Sending request…' : label}</button></form>
+  return <form className="form-panel api-form" onSubmit={submit}>{children}{error && <Notice error>{error}</Notice>}{success && <Notice>{successMessage ?? 'The API acknowledged this action. Refresh the relevant view to see its current state.'}</Notice>}<button type="submit" className="button button-primary mt-6" disabled={pending}>{pending ? 'Sending request…' : label}</button></form>
 }
 export function Acknowledgement({ name, children }: { name: string; children: ReactNode }) { return <label className="checkbox-label"><input type="checkbox" name={name} required />{children}</label> }
 export class ApiBoundary extends Component<{ children: ReactNode; routeKey?: string }, { error: string }> {

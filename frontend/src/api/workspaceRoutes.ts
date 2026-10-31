@@ -10,7 +10,7 @@ export function safeReturnPath(value: string | null): string | null {
     if (Array.from(decodeURIComponent(value)).some(char => char === '\\' || char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) return null
     const url = new URL(value, 'https://workspace.invalid')
     if (url.origin !== 'https://workspace.invalid') return null
-    const allowed = /^\/(?:workspace|employee|account|admin\/users|operations|improvements|themes|learning(?:\/[a-zA-Z0-9-]+)?|observations\/[a-zA-Z0-9-]+|review(?:\/[a-zA-Z0-9-]+)?)$/
+    const allowed = /^\/(?:workspace|employee|account|admin\/users(?:\/[a-zA-Z0-9-]+)?|operations|improvements|themes|learning(?:\/[a-zA-Z0-9-]+)?|observations\/[a-zA-Z0-9-]+|review(?:\/[a-zA-Z0-9-]+)?)$/
     return allowed.test(url.pathname) ? url.pathname + url.search + url.hash : null
   } catch { return null }
 }
@@ -22,7 +22,7 @@ export function destinationFor(membership: Membership, requested: string | null)
   const permitted = pathname === '/account'
     || (membership.role === 'client' && (pathname === '/workspace' || pathname.startsWith('/observations/')))
     || (['client', 'product_owner'].includes(membership.role) && (pathname === '/themes' || pathname === '/learning' || pathname.startsWith('/learning/')))
-    || (membership.role === 'admin' && pathname === '/admin/users')
+    || (membership.role === 'admin' && (pathname === '/admin/users' || pathname.startsWith('/admin/users/')))
     || (membership.role === 'employee' && pathname === '/employee')
     || (membership.role === 'moderator' && (pathname === '/review' || pathname.startsWith('/review/')))
     || (['admin', 'employee', 'moderator'].includes(membership.role) && pathname === '/operations')

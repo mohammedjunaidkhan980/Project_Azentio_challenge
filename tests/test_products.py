@@ -8,6 +8,7 @@ from app.core.security import create_access_token, hash_password
 from app.models.membership import OrganisationMembership, RoleEnum
 from app.models.organisation import Organisation
 from app.models.product import Product
+from app.models.permission import PermissionGrant
 from app.models.user import User
 
 
@@ -27,6 +28,12 @@ async def _seed_user_with_role(db: AsyncSession, role: RoleEnum, email: str = "u
         id=uuid.uuid4(), user_id=user.id, organisation_id=org.id,
         role=role, is_active=True,
     ))
+    if role == RoleEnum.ADMIN:
+        # Existing publication tests use an explicitly granted fixture admin.
+        membership = next(m for m in db.new if isinstance(m, OrganisationMembership))
+        for action in ["publish", "unpublish"]:
+            db.add(PermissionGrant(membership_id=membership.id, permission="products." + action,
+                is_active=True, created_by_user_id=user.id))
     await db.commit()
     return user
 
@@ -105,7 +112,7 @@ async def test_create_product_as_admin(client: AsyncClient, db_session: AsyncSes
     admin = await _seed_user_with_role(db_session, RoleEnum.ADMIN, "admin@test.com")
     r = await client.post(
         "/api/v1/products",
-        json={"name": "New Product", "description": "desc", "is_published": True},
+        json={"name": "New Product", "description": "desc", "is_published": False},
         headers=_auth(admin),
     )
     assert r.status_code == 201
@@ -113,6 +120,7 @@ async def test_create_product_as_admin(client: AsyncClient, db_session: AsyncSes
     assert body["success"] is True
     assert body["data"]["name"] == "New Product"
     assert body["data"]["slug"] == "new-product"
+    assert body["data"]["is_published"] is False
 
 
 @pytest.mark.asyncio

@@ -16,6 +16,8 @@ from app.models.phase4 import (
     AuditEvent,
 )
 
+from app.models.permission import PermissionGrant
+
 __all__ = [
     "User", "Organisation", "OrganisationMembership", "RoleEnum", "Product",
     "DemoEnquiry", "EnquiryStatusEnum", "Observation", "ObservationConsentEvent",
@@ -23,5 +25,5 @@ __all__ = [
     "ModerationReview", "ModerationDecisionEnum", "SharedLearningEntry",
     "SharedLearningStatusEnum", "OrganisationProductEntitlement",
     "ProductImprovement", "ProductImprovementEvidence", "ImprovementStatusEnum",
-    "AuditEvent",
+    "AuditEvent", "PermissionGrant",
 ]

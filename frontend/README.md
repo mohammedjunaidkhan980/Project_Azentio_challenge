@@ -39,3 +39,23 @@ Full page reload intentionally discards memory-held credentials and requires a n
 No active membership displays a restricted account state instead of a fake workspace. Inactive accounts share the generic invalid-credentials response to avoid exposing account status. Inactive organisations are filtered by /auth/me and rejected by server permission checks. Workspace selection is not a permission grant; every API operation still validates server membership/role/product scope.
 
 The employee landing links only to existing authorised operational work and states that additional internal resources are unavailable. It is not a completed internal playground, knowledge library or employee innovation portal. Those requirement gaps remain tracked privately.
+
+
+## Admin management and delegated catalogue actions
+
+`/admin/users/:id` is an admin-only, routed detail page with actual status,
+membership, organisation product-access and catalogue-grant controls. Account,
+role, membership and grant changes use confirmed server responses and refresh data.
+The UI reads `/products/access` before exposing catalogue controls. Managed offering
+selection uses `/products/managed`; there is no manual product-ID entry for normal
+create/edit/publish/unpublish actions. Creation is draft-only. Publication and
+unpublication have independent grants and explicit confirmations. Editing a live
+offering also requires publishing permission. The previous developer warning is
+removed; missing rights hide actions or give an appropriate read-only explanation.
+The backend remains authoritative, including after a grant is revoked.
+
+Real regression coverage is in `e2e-live/admin-management.spec.ts`; configure the
+existing local FastAPI/MySQL stack and private `AZENTIO_DEMO_CREDENTIALS` file.
+Backend migration `catalogue_permission_grants` must be applied first. No seed
+passwords or production URLs are bundled. Catalogue grants do not implement the
+remaining invitation, internal publishing, client-admin or provider-identity scope.
