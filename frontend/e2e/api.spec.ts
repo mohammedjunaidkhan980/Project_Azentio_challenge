@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './demo-fixture'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
@@ -6,7 +6,7 @@ const productId = '11111111-1111-4111-8111-111111111111', org = '22222222-2222-4
 // These are illustrative response contracts, not a running backend or persistence test.
 async function contractBackend(page: Page, role = 'client', unsafeShared = false) {
   const calls: { method: string; path: string; body: Record<string, unknown> }[] = []
-  const product = { id: productId, slug: 'synthetic-analysis', name: 'API Synthetic Analysis', description: 'Synthetic API product', category: 'Lending', is_published: true }
+  let product = { id: productId, slug: 'synthetic-analysis', name: 'API Synthetic Analysis', description: 'Synthetic API product', category: 'Lending', is_published: true }
   let observation = { id: obsId, title: 'Submitted synthetic observation', description: 'PRIVATE-SOURCE synthetic branch information.', organisation_id: org, created_by_user_id: 'user-synthetic', status: 'private', consent_status: role === 'moderator' ? 'granted' : 'not_granted' }
   let reviewed = false, published = role === 'client', status = 'proposed'
   await page.route('**/api/v1/**', async route => {
@@ -20,8 +20,12 @@ async function contractBackend(page: Page, role = 'client', unsafeShared = false
     if (path === '/health') data = { status: 'ok' }
     else if (path === '/auth/login' || path === '/auth/refresh') data = { access_token: 'synthetic-contract-access', refresh_token: 'synthetic-contract-refresh', token_type: 'bearer' }
     else if (path === '/auth/me') data = { id: 'user-synthetic', email: 'synthetic@example.com', full_name: 'Synthetic Account', is_active: true, is_verified: true, memberships: [{ organisation_id: org, organisation_name: 'Fictional API Bank', role, is_active: true }] }
+    else if (path === '/admin/users' && method === 'GET') data = []
+    else if (path === '/products/access') data = { create: role === 'admin', edit: role === 'admin', publish: role === 'admin', unpublish: role === 'admin' }
+    else if (path === '/products/managed') data = [product]
+    else if (path === `/products/${productId}/publish`) { product = { ...product, is_published: true }; data = product }
     else if (path === '/products' && method === 'GET') { data = [{ ...product, name: meta.page === 2 ? 'Second page product' : product.name }]; meta = { ...meta, total: 2, total_pages: 2 } }
-    else if (path === `/products/${productId}`) data = product
+    else if (path === `/products/${productId}`) { product = { ...product, ...body, ...(method === 'DELETE' ? { is_published: false } : {}) }; data = product }
     else if (path === '/demo-enquiries' && method === 'POST') data = { id: 'enquiry-synthetic' }
     else if (path === '/demo-enquiries') data = [{ id: 'enquiry-synthetic', status: 'new', organisation_name: 'Fictional API Bank', product_interest: 'Synthetic analysis' }]
     else if (path.startsWith('/demo-enquiries/')) data = { id: 'enquiry-synthetic', status: body?.status ?? 'new', name: 'Synthetic', work_email: 'synthetic@example.com', requirements: 'Synthetic requirements' }
@@ -38,7 +42,8 @@ async function contractBackend(page: Page, role = 'client', unsafeShared = false
     else if (path === '/product-improvements') data = [{ id: 'idea-synthetic', title: 'Synthetic improvement', description: 'Synthetic proposed outcome', status, organisation_id: org, evidence: [{ active: true }] }]
     else if (path.endsWith('/status')) { status = String(body?.status); data = { id: 'idea-synthetic', status } }
     else if (path === '/audit-events') data = [{ id: 'audit-synthetic', action: 'publication_reviewed', occurred_at: '2026-10-30T16:00:00Z', private_metadata: 'DO-NOT-RENDER' }]
-    else if (path === '/entitlements/product' || path === '/products') data = { id: productId, ...body }
+    else if (path === '/products') { product = { ...product, ...body }; data = product }
+    else if (path === '/entitlements/product') data = { id: productId, ...body }
     else { await route.fulfill({ status: 404, headers, json: { success: false, error: { code: 'NOT_DOCUMENTED' }, data: null } }); return }
     await route.fulfill({ headers, json: { success: true, message: 'Contract mock acknowledged', data, meta } })
   })
@@ -47,10 +52,10 @@ async function contractBackend(page: Page, role = 'client', unsafeShared = false
 async function connect(page: Page, signIn = true) {
   await page.goto('/connect')
   if (signIn) {
-    await page.getByLabel('Email address', { exact: true }).fill('synthetic@example.com')
+    await page.getByLabel('Work email', { exact: true }).fill('synthetic@example.com')
     await page.getByLabel('Password', { exact: true }).fill('synthetic-test-only')
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Signed-in profile' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Workspace', exact: true })).toBeVisible()
   }
 }
 
@@ -79,7 +84,6 @@ test('contract mock: API catalogue pagination and documented enquiry payload', a
 test('contract mock: create without automatic consent, explicit grant, withdrawal and feed refresh', async ({ page }) => {
   const calls = await contractBackend(page)
   await connect(page)
-  await page.getByRole('link', { name: 'Open workspace', exact: true }).click()
   await page.getByRole('link', { name: 'New observation' }).click()
   await page.getByLabel('Title', { exact: true }).fill('API synthetic observation')
   await page.getByLabel('Observation (10–10000 characters)').fill('Synthetic observation for this contract test.')
@@ -101,7 +105,6 @@ test('contract mock: create without automatic consent, explicit grant, withdrawa
 test('contract mock: moderator approval and publication are separate calls', async ({ page }) => {
   const calls = await contractBackend(page, 'moderator')
   await connect(page)
-  await page.getByRole('link', { name: 'Open workspace', exact: true }).click()
   await page.getByRole('link', { name: 'Moderator review', exact: true }).click()
   await page.getByRole('link', { name: 'Review proposal' }).click()
   await page.getByLabel('Decision reason').fill('Removed synthetic identifying details.')
@@ -120,7 +123,6 @@ test('contract mock: moderator approval and publication are separate calls', asy
 test('contract mock: client-safe copy and detail never render private source metadata', async ({ page }) => {
   await contractBackend(page)
   await connect(page)
-  await page.getByRole('link', { name: 'Open workspace', exact: true }).click()
   await page.getByRole('link', { name: 'Approved learning', exact: true }).click()
   await expect(page.getByRole('article')).toContainText('Reviewed synthetic wording only.')
   await expect(page.getByRole('article')).not.toContainText('PRIVATE-SOURCE')
@@ -132,7 +134,6 @@ test('contract mock: client-safe copy and detail never render private source met
 test('contract mock: unsupported shared schema fails closed without a private fallback', async ({ page }) => {
   await contractBackend(page, 'client', true)
   await connect(page)
-  await page.getByRole('link', { name: 'Open workspace', exact: true }).click()
   await page.getByRole('link', { name: 'Approved learning', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'API contract needs attention' })).toBeVisible()
   await expect(page.locator('body')).not.toContainText('PRIVATE-SOURCE')
@@ -141,7 +142,6 @@ test('contract mock: unsupported shared schema fails closed without a private fa
 test('contract mock: owner improvement transitions and evidence-linked creation', async ({ page }) => {
   const calls = await contractBackend(page, 'product_owner')
   await connect(page)
-  await page.getByRole('link', { name: 'Open workspace', exact: true }).click()
   await page.getByRole('link', { name: 'Product improvements', exact: true }).click()
   await page.getByLabel('Status reason').fill('Reviewing synthetic evidence.')
   await page.getByRole('button', { name: 'Update improvement status' }).click()
@@ -158,7 +158,7 @@ test('contract mock: owner improvement transitions and evidence-linked creation'
 test('contract mock: connection failure is explicit and API login reflows accessibly', async ({ page }) => {
   await page.route('**/api/v1/**', route => route.abort('connectionrefused'))
   await connect(page, false)
-  await page.getByLabel('Email address', { exact: true }).fill('synthetic@example.com')
+  await page.getByLabel('Work email', { exact: true }).fill('synthetic@example.com')
   await page.getByLabel('Password', { exact: true }).fill('nonfunctional-test-input')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Sign-in is temporarily unavailable')
@@ -170,7 +170,6 @@ test('contract mock: connection failure is explicit and API login reflows access
 test('contract mock: admin operations use the documented management endpoints', async ({ page }) => {
   const calls = await contractBackend(page, 'admin')
   await connect(page)
-  await page.getByRole('link', { name: 'Open workspace', exact: true }).click()
   await page.getByRole('link', { name: 'Operations', exact: true }).click()
   await page.getByRole('button', { name: 'Open enquiry', exact: true }).click()
   await page.getByLabel('Enquiry status', { exact: true }).selectOption('in_review')
@@ -183,15 +182,16 @@ test('contract mock: admin operations use the documented management endpoints', 
   await expect(create.getByRole('status')).toBeVisible()
   expect(calls.find(c => c.path === '/products' && c.method === 'POST')?.body.is_published).toBe(false)
   const edit = page.getByRole('heading', { name: 'Edit product', exact: true }).locator('..')
-  await edit.getByLabel('Product UUID').fill(productId)
   await edit.getByLabel('Product name').fill('Synthetic updated product')
   await edit.getByRole('button', { name: 'Update product details' }).click()
-  await expect(edit.getByRole('status')).toBeVisible()
-  const unpublish = page.getByRole('heading', { name: 'Unpublish product', exact: true }).locator('..')
-  await unpublish.getByLabel('Product UUID').fill(productId)
+  await expect(page.getByText('Offering changes saved.', { exact: true })).toBeVisible()
+  const publish = page.getByRole('button', { name: 'Publish offering', exact: true }).locator('..')
+  await publish.getByRole('checkbox').check()
+  await publish.getByRole('button', { name: 'Publish offering', exact: true }).click()
+  const unpublish = page.getByRole('button', { name: 'Unpublish product', exact: true }).locator('..')
   await unpublish.getByRole('checkbox').check()
   await unpublish.getByRole('button', { name: 'Unpublish product', exact: true }).click()
-  await expect(unpublish.getByRole('status')).toBeVisible()
+  await expect(page.getByText('Offering unpublished.', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Entitlements', exact: true }).click()
   await page.getByLabel('Product UUID', { exact: true }).fill(productId)
   await page.getByRole('checkbox').check()
@@ -219,7 +219,6 @@ test('contract mock: reload keeps API mode but clears credentials; sign-out does
 test('contract mock: a foreign-organisation response is not rendered in the selected workspace', async ({ page }) => {
   await contractBackend(page)
   await connect(page)
-  await page.getByRole('link', { name: 'Open workspace', exact: true }).click()
   await page.route(`**/api/v1/observations/${obsId}`, route => route.fulfill({ headers: { 'access-control-allow-origin': '*' }, json: { success: true, message: 'Mock scope mismatch', data: { id: obsId, organisation_id: 'other-organisation', title: 'FOREIGN-PRIVATE-TITLE', description: 'FOREIGN-PRIVATE-BODY' }, meta: {} } }))
   await page.getByRole('link', { name: 'View observation', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'API contract needs attention' })).toBeVisible()
@@ -229,7 +228,6 @@ test('contract mock: a foreign-organisation response is not rendered in the sele
 test('contract mock: unpublishing requires moderator membership', async ({ page }) => {
   const calls = await contractBackend(page, 'moderator')
   await connect(page)
-  await page.getByRole('link', { name: 'Open workspace', exact: true }).click()
   await page.getByRole('link', { name: 'Operations', exact: true }).click()
   await page.getByRole('button', { name: 'Unpublish', exact: true }).click()
   await page.getByLabel('Shared-entry UUID').fill(sharedId)

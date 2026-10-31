@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './demo-fixture'
 import AxeBuilder from '@axe-core/playwright'
 
 for (const route of ['/', '/offerings', '/demo', '/workspace', '/observations/new']) {

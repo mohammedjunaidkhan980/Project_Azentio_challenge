@@ -18,7 +18,7 @@ from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal, engine
 from app.models.membership import OrganisationMembership, RoleEnum
 from app.models.organisation import Organisation
-from app.models.product import Product
+from scripts.refresh_catalogue import refresh
 from app.models.user import User
 
 
@@ -64,13 +64,8 @@ async def seed(path: Path):
                     "organisation_id": saved["organisations"][org_key]}
             elif key not in saved["users"]:
                 raise RuntimeError("Existing synthetic account has no local credentials; refusing to reset it")
-        product = await db.scalar(select(Product).where(Product.slug == "synthetic-demo-analysis"))
-        if product is None:
-            product = Product(name="SYNTHETIC Analysis", slug="synthetic-demo-analysis",
-                description="Fictional local integration product. No customer data.", is_published=True)
-            db.add(product)
-            await db.flush()
-        saved["product_id"] = str(product.id)
+        products, _ = await refresh(db)
+        saved["product_id"] = str(products["synthetic-demo-analysis"].id)
     path.write_text(json.dumps(saved, indent=2), encoding="utf-8")
     await engine.dispose()
     print("Synthetic demo provisioned; existing accounts preserved; credentials written only to private file")

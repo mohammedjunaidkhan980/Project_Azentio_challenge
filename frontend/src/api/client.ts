@@ -61,7 +61,7 @@ export class ApiClient {
     try {
       response = await this.transport(`${this.baseURL}${path}`, { method: options.method ?? 'GET', headers: { Accept: 'application/json', ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(auth && token ? { Authorization: `Bearer ${token}` } : {}) }, body: options.body === undefined ? undefined : JSON.stringify(options.body), credentials: 'omit', cache: 'no-store', signal: controller.signal })
     } catch {
-      throw new ApiError(0, 'NETWORK_ERROR', controller.signal.aborted ? 'The request was cancelled or timed out. Retry when ready.' : 'Cannot reach the API. Check the configured URL, server and CORS settings. No demo data was substituted.')
+      throw new ApiError(0, 'NETWORK_ERROR', controller.signal.aborted ? 'The request timed out or was interrupted. Please try again.' : 'The service is temporarily unavailable. Please try again shortly.')
     } finally { clearTimeout(timeout); options.signal?.removeEventListener('abort', abort) }
     if (auth && epoch !== this.epoch) throw new ApiError(401, 'SESSION_CHANGED', 'Your session changed during the request.')
     if (response.status === 401 && auth && retry) {

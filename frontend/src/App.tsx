@@ -1,4 +1,5 @@
-import { Register, AdminUsers } from './api/Admin'
+import { Account, EmployeeWorkspace } from './api/Account'
+import { Register, AdminUsers, AdminUserDetail } from './api/Admin'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { Shell } from './components/Shell'
 import { ActionLink, EmptyState } from './components/ui'
@@ -23,5 +24,5 @@ export function App() {
 function ApplicationRoutes() {
   const { scopeKey } = useSession()
   const { pathname } = useLocation()
-  return <ApiBoundary key={scopeKey} routeKey={pathname}><Routes><Route element={<Shell />}><Route index element={<Home />} /><Route path="connect" element={<Connection />} /><Route path="register" element={<Register />} /><Route path="admin/users" element={<AdminUsers />} /><Route path="offerings" element={<Catalogue />} /><Route path="offerings/:slug" element={<OfferingDetail />} /><Route path="demo" element={<Enquiry />} /><Route path="learning" element={<Learning />} /><Route path="learning/:id" element={<ApiSharedDetail />} /><Route path="themes" element={<Themes />} /><Route path="improvements" element={<Improvements />} /><Route path="operations" element={<Operations />} /><Route path="workspace" element={<Dashboard />} /><Route path="observations/new" element={<ObservationRoute />} /><Route path="observations/:id" element={<ObservationRoute />} /><Route path="review" element={<ReviewQueue />} /><Route path="review/:id" element={<ReviewRoute />} /><Route path="*" element={<NotFound />} /></Route></Routes></ApiBoundary>
+  return <ApiBoundary key={scopeKey} routeKey={pathname}><Routes><Route element={<Shell />}><Route index element={<Home />} /><Route path="connect" element={<Connection />} /><Route path="account" element={<Account />} /><Route path="employee" element={<EmployeeWorkspace />} /><Route path="register" element={<Register />} /><Route path="admin/users" element={<AdminUsers />} /><Route path="admin/users/:id" element={<AdminUserDetail />} /><Route path="offerings" element={<Catalogue />} /><Route path="offerings/:slug" element={<OfferingDetail />} /><Route path="demo" element={<Enquiry />} /><Route path="learning" element={<Learning />} /><Route path="learning/:id" element={<ApiSharedDetail />} /><Route path="themes" element={<Themes />} /><Route path="improvements" element={<Improvements />} /><Route path="operations" element={<Operations />} /><Route path="workspace" element={<Dashboard />} /><Route path="observations/new" element={<ObservationRoute />} /><Route path="observations/:id" element={<ObservationRoute />} /><Route path="review" element={<ReviewQueue />} /><Route path="review/:id" element={<ReviewRoute />} /><Route path="*" element={<NotFound />} /></Route></Routes></ApiBoundary>
 }

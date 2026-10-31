@@ -1,10 +1,10 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './demo-fixture'
 import AxeBuilder from '@axe-core/playwright'
 
 test('public catalogue, detail and enquiry support validation and failure recovery', async ({ page }) => {
   await page.goto('/offerings')
   await expect(page.getByRole('article')).toHaveCount(3)
-  await page.getByRole('textbox', { name: 'Search offerings' }).fill('seasonal')
+  await page.getByRole('textbox', { name: 'Search offerings' }).fill('no-matching-offering')
   await expect(page.getByRole('article')).toHaveCount(0)
   await page.getByRole('textbox', { name: 'Search offerings' }).fill('cash-flow')
   await expect(page.getByRole('article')).toHaveCount(1)

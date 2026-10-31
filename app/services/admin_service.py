@@ -143,6 +143,8 @@ class AdminService:
         if not membership:
             raise _error("MEMBERSHIP_NOT_FOUND", "Membership not found", 404)
 
+        if actor.id == user_id and membership.role == RoleEnum.ADMIN and (is_active is False or (role is not None and role != RoleEnum.ADMIN)):
+            raise _error("CURRENT_ADMIN_REQUIRED", "Your current administrator membership cannot be removed here", 409)
         previous_role = membership.role.value
         previous_status = membership.is_active
         if role is not None:
@@ -187,6 +189,8 @@ class AdminService:
         if not membership:
             raise _error("MEMBERSHIP_NOT_FOUND", "Membership not found", 404)
 
+        if actor.id == user_id and membership.role == RoleEnum.ADMIN:
+            raise _error("CURRENT_ADMIN_REQUIRED", "Your current administrator membership cannot be removed here", 409)
         membership.is_active = False
         self.db.add(
             self._audit(
@@ -204,6 +208,8 @@ class AdminService:
 
     async def update_user_status(self, actor: User, user_id: uuid.UUID, is_active: bool) -> User:
         user = await self.get_user(user_id)
+        if actor.id == user_id and not is_active:
+            raise _error("CURRENT_ADMIN_REQUIRED", "You cannot deactivate your own administrator account", 409)
         previous_status = user.is_active
         user.is_active = is_active
         self.db.add(

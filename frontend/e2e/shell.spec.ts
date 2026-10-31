@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './demo-fixture'
 import AxeBuilder from '@axe-core/playwright'
 
 test('shell is navigable and has no detected serious accessibility violations', async ({ page }) => {

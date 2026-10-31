@@ -10,15 +10,15 @@ import { useResource } from './useResource'
 export function ApiCatalogue() {
   const [page, setPage] = useState(1), [query, setQuery] = useState('')
   const resource = useResource(useCallback((signal: AbortSignal) => services.products(page, signal), [page]))
-  return <div className="container section"><PageHeading eyebrow="API PRODUCT CATALOGUE" title="Find the right starting point." description="Published products from your configured backend. API errors never fall back to illustrative offerings." /><label className="search-field"><span className="sr-only">Search this product page</span><input placeholder="Search this page" value={query} onChange={e => setQuery(e.target.value)} /></label><div className="mt-6"><Resource resource={resource}>{data => {
+  return <div className="container section"><PageHeading eyebrow="AI OFFERINGS" title="Find the right starting point." description="Explore intelligent solutions for lending, operations, risk and compliance." /><label className="search-field"><span className="sr-only">Search this product page</span><input placeholder="Search this page" value={query} onChange={e => setQuery(e.target.value)} /></label><div className="mt-6"><Resource resource={resource}>{data => {
     const rows = records(data).filter(p => p.is_published === true && `${text(p.name)} ${text(p.description)}`.toLowerCase().includes(query.toLowerCase()))
-    return rows.length ? <div className="offering-grid">{rows.map(p => <article className="offering-card" key={text(p.id)}><Badge>{text(p.category) || 'AI offering'}</Badge><h2 className="mt-6">{text(p.name)}</h2><p>{text(p.description) || 'No description provided.'}</p><Link className="card-link" to={`/offerings/${encodeURIComponent(text(p.id))}`}>Explore offering: {text(p.name)}</Link></article>)}</div> : <EmptyState title="No published products found">Try another search or page. Search is limited to this page because no server search endpoint is documented.</EmptyState>
+    return rows.length ? <div className="offering-grid">{rows.map(p => <article className="offering-card" key={text(p.id)}><Badge>{text(p.category) || 'AI offering'}</Badge><h2 className="mt-6">{text(p.name)}</h2><p>{text(p.description) || 'No description provided.'}</p><Link className="card-link" to={`/offerings/${encodeURIComponent(text(p.id))}`}>Explore offering: {text(p.name)}</Link></article>)}</div> : <EmptyState title="No published products found">Try a different search or browse another page.</EmptyState>
   }}</Resource></div><Pagination page={page} setPage={setPage} response={resource.response} /></div>
 }
 export function ApiProduct() {
   const { slug = '' } = useParams()
   const resource = useResource(useCallback((signal: AbortSignal) => services.product(slug, signal), [slug]))
-  return <div className="container section"><Link className="back-link" to="/offerings">← All offerings</Link><Resource resource={resource}>{data => { const p = object(data); return <><PageHeading eyebrow={text(p.category) || 'API OFFERING'} title={text(p.name)} description={text(p.description) || 'No description provided.'} /><ActionLink to={`/demo?product=${encodeURIComponent(text(p.id))}`}>Request a demo</ActionLink></> }}</Resource></div>
+  return <div className="container section"><Link className="back-link" to="/offerings">← All offerings</Link><Resource resource={resource}>{data => { const p = object(data); return <><PageHeading eyebrow={text(p.category) || 'AI OFFERING'} title={text(p.name)} description={text(p.description) || 'No description provided.'} /><ActionLink to={`/demo?product=${encodeURIComponent(text(p.id))}`}>Request a demo</ActionLink></> }}</Resource></div>
 }
 export function ApiEnquiry() {
   const [search] = useSearchParams()

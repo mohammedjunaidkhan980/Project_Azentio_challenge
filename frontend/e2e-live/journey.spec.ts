@@ -7,6 +7,31 @@ const path = process.env.AZENTIO_DEMO_CREDENTIALS
 if (!path) throw new Error('Set AZENTIO_DEMO_CREDENTIALS to the private synthetic fixture file')
 const fixture = JSON.parse(readFileSync(path, 'utf8'))
 
+test('REAL catalogue: polished offering copy comes from MySQL without technical header text', async ({ page }) => {
+  await page.goto('/connect')
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
+  const catalogue = page.waitForResponse(r => r.url().includes('/api/v1/products?') && r.request().method() === 'GET')
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'AI offerings', exact: true }).click()
+  const response = await catalogue
+  expect(response.status()).toBe(200)
+  const products = (await (await page.request.get('/api/v1/products')).json()).data as { id: string; name: string; description: string }[]
+  expect(products).toHaveLength(3)
+  expect(products.find(p => p.name === 'Financial Analysis Intelligence')?.id).toBe(fixture.product_id)
+  for (const name of ['Financial Analysis Intelligence', 'Document Intelligence', 'Risk & Compliance Intelligence']) {
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+  }
+  expect(products.every(p => p.description.length > 80 && !/synthetic|placeholder|fictional|integration product/i.test(p.name + p.description))).toBe(true)
+  await expect(page.locator('main')).not.toContainText(/API PRODUCT CATALOGUE|configured backend|API errors|No description provided|SYNTHETIC Theme/)
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+    await page.screenshot({ path: `.local/catalogue-${width}.png`, fullPage: true })
+  }
+  await page.getByRole('link', { name: 'Explore offering: Financial Analysis Intelligence', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Financial Analysis Intelligence', exact: true })).toBeVisible()
+  await expect(page.getByText(products.find(p => p.id === fixture.product_id)!.description, { exact: true })).toBeVisible()
+})
+
 test('REAL login: responsive corporate presentation, invalid credentials and offline recovery', async ({ browser }) => {
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:5174' })
   const page = await context.newPage()
@@ -25,7 +50,7 @@ test('REAL login: responsive corporate presentation, invalid credentials and off
     expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([])
     await page.screenshot({ path: `.local/login-${width}.png`, fullPage: true })
   }
-  await page.getByLabel('Email address', { exact: true }).fill(fixture.users.client_a.email)
+  await page.getByLabel('Work email', { exact: true }).fill(fixture.users.client_a.email)
   await page.getByLabel('Password', { exact: true }).fill('deliberately-incorrect-synthetic-input')
   const rejected = page.waitForResponse(r => r.url().endsWith('/auth/login'))
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -41,7 +66,7 @@ test('REAL login: responsive corporate presentation, invalid credentials and off
     (input as HTMLInputElement).value = password
   }, fixture.users.client_a.password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Signed-in profile' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Workspace', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
   await page.context().close()
@@ -50,14 +75,13 @@ test('REAL login: responsive corporate presentation, invalid credentials and off
 async function signIn(browser: Browser, role: string) {
   const page = await browser.newPage({ baseURL: 'http://127.0.0.1:5174' })
   await page.goto('/connect')
-  await page.getByLabel('Email address', { exact: true }).fill(fixture.users[role].email)
+  await page.getByLabel('Work email', { exact: true }).fill(fixture.users[role].email)
   // No traces, videos, screenshots or credential-bearing fill action logs.
   await page.locator('input[name="password"]').evaluate((input, password) => {
     (input as HTMLInputElement).value = password
   }, fixture.users[role].password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Signed-in profile' })).toBeVisible()
-  await page.getByRole('link', { name: 'Open workspace', exact: true }).click()
+  await expect(page.getByRole('navigation', { name: 'Workspace', exact: true })).toBeVisible()
   return page
 }
 
@@ -158,7 +182,7 @@ test('REAL HTTP/MySQL: browser author → consent → moderation → entitled le
   await reader.getByRole('link', { name: 'Approved learning', exact: true }).click()
   await expect(reader.getByRole('heading', { name: marker + ' approved', exact: true })).toHaveCount(0)
   expect(Date.now() - start).toBeLessThan(60000)
-  await owner.getByRole('link', { name: 'Connection & profile', exact: true }).click()
+  await owner.getByRole('link', { name: 'Account', exact: true }).click()
   await owner.getByRole('link', { name: 'Open workspace', exact: true }).click()
   await owner.getByRole('link', { name: 'Product improvements', exact: true }).click()
   await expect(owner.locator('article').filter({ has: owner.getByRole('heading', { name: marker + ' improvement', exact: true }) }).getByText('Supporting evidence unavailable or withdrawn')).toBeVisible()

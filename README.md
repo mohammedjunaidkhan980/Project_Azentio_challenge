@@ -226,7 +226,7 @@ GET /api/v1/shared-learning now accepts optional q (maximum200 characters) and p
 
 GET /api/v1/learning-themes is available to active client/product_owner memberships with relevant product entitlements. It returns deterministic approved-copy groups with title, product_id, distinct_organisations, limitations, method, publication_window_start/end, updated_at and supporting_contributions (approved entry id/title only, capped at20). THEME_MIN_ORGANISATIONS defaults to3 and cannot be lower than3. Sub-threshold groups and their counts are omitted. The window describes publication dates, not source observation dates. No AI, model training or formal privacy guarantee is claimed. Themes are computed from current published, consent-active records with no cache; withdrawal immediately re-evaluates the cohort.
 
-Real identity flags are now enforced on login/refresh/protected requests. Only active memberships in active organisations grant role permissions. Ordinary employee membership cannot edit catalogue content. Portal admin does not imply moderator or product-owner permission; those operations require a corresponding membership. Admin audit and entitlement administration remain available. Improvements are scoped to active client/owner organisations and matching product entitlements; staff job titles do not reveal unassigned client work. Product owners require entitlement before creating/changing an idea. This is an interim five-role model: client_admin, content-publisher grants, managed identity/invitations and explicit server workspace context still require implementation. A demo verified flag is not a real identity provider.
+Real identity flags are now enforced on login/refresh/protected requests. Only active memberships in active organisations grant role permissions. Ordinary employee membership grants no catalogue writes; each employee catalogue action requires an explicit grant. Portal admin does not imply moderator or product-owner permission; those operations require a corresponding membership. Admin audit and entitlement administration remain available. Improvements are scoped to active client/owner organisations and matching product entitlements; staff job titles do not reveal unassigned client work. Product owners require entitlement before creating/changing an idea. This is an interim five-role model: client_admin, publishing grants beyond the catalogue, managed identity/invitations and explicit server workspace context still require implementation. A demo verified flag is not a real identity provider.
 
 Real MySQL checks (use the private synthetic fixture file; never commit it):
 
@@ -238,3 +238,60 @@ python -m scripts.check_learning_themes --credentials-file <private-directory>/d
 Run the real browser suite while the theme cohort is active. Then withdraw only those synthetic theme fixtures with check_learning_themes --credentials-file <private-directory>/demo-accounts.json --cleanup. The role check temporarily toggles synthetic verification/tenant flags and restores their previous values in finally blocks; do not run it concurrently with other demo users. The seed helper now also creates synthetic employee and second-tenant owner accounts without resetting existing accounts. Private reference analysis/status documents are intentionally not part of this shared repository.
 
 Current scoped verification: backend63 testsPASS (disposable SQLite),35 real MySQL role checksPASS,50 real workflow HTTP checksPASS,3 real browser journeysPASS, frontend build/lint/typecheck and47 unit testsPASS. Production browser regression had53 initial passes and2 corrected test expectations/races, then3 targeted cases passed (including one new moderator case); no consolidated56/56 run is claimed. Full feature coverage remains partial: executable sandbox, employee workspace, author-private draft/returned-edit lifecycle, separate consent purposes, invitations/managed identity, report notifications and granular grants require further work.
+
+### Catalogue presentation data
+
+The API catalogue reads MySQL products, not the preview adapter. Local seed presentation copy is maintained in scripts/refresh_catalogue.py and applied by scripts/seed_local_demo.py. Run python -m scripts.refresh_catalogue to refresh only the isolated azentio_dev catalogue. It retains the original financial-analysis product ID/slug and all relationships, upserts three curated offering concepts, and unpublishes known synthetic-theme integration products without deleting them. New theme test products are unpublished from creation and remain unpublished after cleanup. The preview catalogue uses matching descriptions. These are demonstration offering concepts, not a claim of approved released capabilities; scenario data remains fictional.
+
+The customer catalogue header contains business copy only. Catalogue checks verify real MySQL/proxy responses, stable IDs/evidence references, seed idempotence and responsive offering/detail navigation; local screenshots and credentials are excluded from Git.
+
+
+## Admin user management and catalogue grants
+
+Run `alembic upgrade head` before starting this version. The additive
+`catalogue_permission_grants` revision creates only the membership-scoped grant
+and audit-linked author fields; it does not reset users, roles, products or passwords.
+No publishing rights are automatically seeded. Existing administrators retain draft
+creation/editing; publish and unpublish require separate explicit grants.
+Employees need independent `products.create`, `products.edit`, `products.publish`
+and `products.unpublish` grants. Clients/moderators/owners gain none by job title.
+Only an active, verified identity and an active eligible membership in an active
+organisation can exercise a grant. The server rereads grants on each request.
+
+Manage user navigates to `/admin/users/:id`; it no longer appends an off-screen
+panel. Details show actual identity approval, account state, memberships, roles,
+organisation product entitlements and catalogue grants. Account/membership/grant
+changes require confirmation and reload server data. Current administrators cannot
+remove their own admin membership or deactivate themselves. Email verification
+is read-only; no invitation, password-reset or verification workflow is invented.
+Entitlements remain organisation-wide, rather than pretending to be user-specific.
+Portal administrators legitimately manage users across organisations; ordinary
+members cannot call those endpoints. A membership ID must belong to the target user.
+
+Added contracts (all under `/api/v1`, existing success/error envelopes):
+
+| Method/path | Permission and response |
+| --- | --- |
+| GET `/admin/organisations` | Admin; active `{id,name}` organisations |
+| GET `/admin/users/{id}/product-access` | Admin; `{grants,entitlements}` with product names |
+| POST `/admin/users/{id}/permissions` | Admin; `{membership_id,permission,is_active}`; grants limited to the four actions above |
+| GET `/products/access` | Authenticated; `{create,edit,publish,unpublish}` effective booleans |
+| GET `/products/managed` | At least one effective catalogue action; paged published and draft products |
+| POST `/products/{id}/publish` | Explicit publish grant; persisted product and audit event |
+
+Existing POST `/products` always creates a draft and rejects `is_published:true`.
+Existing PATCH rejects publication flag changes; editing an already published
+offering requires both edit and publish. Existing DELETE unpublishes only with
+an explicit unpublish grant. Public GET routes still exclude unpublished offerings.
+Grant/revoke and product create/edit/publish/unpublish audit writes commit with the
+mutation. Revocation and inactive account/membership/organisation checks are server
+enforced, including for already issued access tokens.
+
+Local verification (synthetic development data only): backend pytest uses a disposable
+SQLite database; live Playwright uses the running Vite → FastAPI → MySQL path.
+Provide `AZENTIO_DEMO_CREDENTIALS` privately; never put credentials in this repository.
+Run the focused live checks with `npx playwright test --config playwright.live.config.ts
+admin-management.spec.ts` from frontend. Then `python -m scripts.check_admin_audit`
+from the root performs a read-only MySQL audit/restoration check. Live traces and
+videos stay disabled. Browser contract mocks remain separately labelled and do not
+prove live integration. Full Challenge 7 scope and production IAM remain incomplete.

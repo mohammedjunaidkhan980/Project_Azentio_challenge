@@ -1,18 +1,19 @@
 import { Component, useId, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
+import { signInPath } from './workspaceRoutes'
 import { EmptyState, Notice } from '../components/ui'
 import { useSession } from './session'
 import type { Envelope } from './client'
 export function Access({ roles, children }: { roles?: string[]; children: ReactNode }) {
   const { user, membership } = useSession()
-  if (!user) return <EmptyState headingLevel={1} title="Sign in to your API workspace" action={<Link className="button button-primary" to="/connect">Sign in</Link>}>No preview persona or local role grants API access.</EmptyState>
-  if (!membership) return <EmptyState headingLevel={1} title="Choose an active organisation">Select one of your active memberships above before continuing.</EmptyState>
-  if (roles && !roles.includes(membership.role)) return <EmptyState headingLevel={1} title="Access denied">This active membership does not have a documented role for this action. Server checks remain authoritative.</EmptyState>
+  const location = useLocation()
+  if (!user || !membership) return <Navigate to={signInPath(location)} replace />
+  if (roles && !roles.includes(membership.role)) return <EmptyState headingLevel={1} title="Access restricted" action={<Link className="button button-primary" to="/workspace">Return to your workspace</Link>}>Your current organisation membership does not include access to this page. Contact your administrator if you need access.</EmptyState>
   return children
 }
 export function Resource({ resource, children }: { resource: { loading: boolean; error: string; response: Envelope<unknown> | null; reload: () => void }; children: (data: unknown) => ReactNode }) {
-  if (resource.loading) return <div role="status" aria-busy="true" className="loading-panel">Loading from the configured API…</div>
+  if (resource.loading) return <div role="status" aria-busy="true" className="loading-panel">Loading your workspace…</div>
   if (resource.error) return <><Notice error>{resource.error}</Notice><button className="button button-secondary mt-4" onClick={resource.reload}>Retry request</button></>
   return resource.response ? children(resource.response.data) : null
 }
@@ -24,7 +25,7 @@ export function Field({ name, label, type = 'text', required = true, maxLength, 
   const identifier = useId()
   return <div className="field"><label htmlFor={identifier}>{label}{!required && <span> (optional)</span>}</label>{children ? <select id={identifier} name={name} required={required} defaultValue={value}>{children}</select> : type === 'textarea' ? <textarea id={identifier} name={name} required={required} minLength={minLength} maxLength={maxLength} defaultValue={value} rows={4} /> : <input id={identifier} name={name} type={type} required={required} maxLength={maxLength} minLength={minLength} defaultValue={value} autoComplete={type === 'password' ? 'current-password' : 'off'} />}</div>
 }
-export function ApiForm({ children, label, onSave, onDone }: { children: ReactNode; label: string; onSave: (values: FormData) => Promise<unknown>; onDone?: () => void }) {
+export function ApiForm({ children, label, onSave, onDone, successMessage }: { children: ReactNode; label: string; onSave: (values: FormData) => Promise<unknown>; onDone?: () => void; successMessage?: string }) {
   const [pending, setPending] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(false)
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); if (pending) return
@@ -34,7 +35,7 @@ export function ApiForm({ children, label, onSave, onDone }: { children: ReactNo
     catch (e) { setError((e as Error).message) }
     finally { setPending(false) }
   }
-  return <form className="form-panel api-form" onSubmit={submit}>{children}{error && <Notice error>{error}</Notice>}{success && <Notice>The API acknowledged this action. Refresh the relevant view to see its current state.</Notice>}<button type="submit" className="button button-primary mt-6" disabled={pending}>{pending ? 'Sending request…' : label}</button></form>
+  return <form className="form-panel api-form" onSubmit={submit}>{children}{error && <Notice error>{error}</Notice>}{success && <Notice>{successMessage ?? 'The API acknowledged this action. Refresh the relevant view to see its current state.'}</Notice>}<button type="submit" className="button button-primary mt-6" disabled={pending}>{pending ? 'Sending request…' : label}</button></form>
 }
 export function Acknowledgement({ name, children }: { name: string; children: ReactNode }) { return <label className="checkbox-label"><input type="checkbox" name={name} required />{children}</label> }
 export class ApiBoundary extends Component<{ children: ReactNode; routeKey?: string }, { error: string }> {

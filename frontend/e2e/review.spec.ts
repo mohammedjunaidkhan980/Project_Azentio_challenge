@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './demo-fixture'
 import AxeBuilder from '@axe-core/playwright'
 
 test('moderator publishes a safe copy; another client sees no private source; author withdraws', async ({ page }) => {
