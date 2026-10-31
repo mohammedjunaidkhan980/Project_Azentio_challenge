@@ -219,4 +219,4 @@ $env:AZENTIO_DEMO_CREDENTIALS='<private-directory>/demo-accounts.json'
 npx playwright test --config playwright.live.config.ts
 ```
 
-This opt-in suite starts Vite on loopback port 5174 and proxies `/api` to FastAPI on 8000. It has no API mocks and disables traces, screenshots and video to avoid credential capture. Do not run it concurrently against the same fixture file. After the test, `npm run dev -- --port 5174` starts the review UI; select API mode on `/connect`. Credentials, database files, server logs and downloaded MySQL binaries remain local and are not distributed.
+This opt-in suite starts Vite on loopback port 5174 and proxies `/api` to FastAPI on 8000. It has no API mocks and disables traces, screenshots and video to avoid credential capture. Do not run it concurrently against the same fixture file. After the test, `npm run dev -- --port 5174` starts the review UI; open `/connect` to sign in. Credentials, database files, server logs and downloaded MySQL binaries remain local and are not distributed.

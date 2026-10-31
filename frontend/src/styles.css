@@ -398,3 +398,16 @@ input::placeholder, textarea::placeholder { color: #64748b; opacity: 1; }
   .detail-aside { padding: 28px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+
+/* Customer sign-in: bounded typography and a single responsive form. */
+.login-page { display: flex; justify-content: center; padding-block: clamp(36px, 7vw, 80px); }
+.login-card { width: 100%; max-width: 460px; min-width: 0; padding: clamp(24px, 5vw, 40px); border: 1px solid #dce3ec; border-radius: 16px; background: #fff; box-shadow: 0 12px 40px #102a4308; }
+.login-card h1 { font-size: clamp(30px, 5vw, 40px); line-height: 1.2; letter-spacing: -.035em; overflow-wrap: anywhere; margin: 12px 0; }
+.login-intro { color: #475569; font-size: 16px; line-height: 1.65; margin-bottom: 28px; }
+.login-card form { display: grid; gap: 20px; }
+.login-card input { width: 100%; min-width: 0; }
+.login-submit { width: 100%; }
+.login-register { font-size: 14px; color: #475569; text-align: center; }
+.login-register a { color: #1d4ed8; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.login-profile { display: grid; gap: 16px; overflow-wrap: anywhere; }
+.login-profile h2 { font-size: 20px; }

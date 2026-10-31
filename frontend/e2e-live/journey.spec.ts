@@ -1,15 +1,55 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import type { Browser } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 
 const path = process.env.AZENTIO_DEMO_CREDENTIALS
 if (!path) throw new Error('Set AZENTIO_DEMO_CREDENTIALS to the private synthetic fixture file')
 const fixture = JSON.parse(readFileSync(path, 'utf8'))
 
+test('REAL login: responsive corporate presentation, invalid credentials and offline recovery', async ({ browser }) => {
+  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:5174' })
+  const page = await context.newPage()
+  await page.goto('/connect')
+  await expect(page.getByRole('heading', { name: 'Welcome back', level: 1 })).toBeVisible()
+  await expect(page.getByText("Sign in to access your organisation's workspace.")).toBeVisible()
+  await expect(page.locator('main')).not.toContainText(/API CONNECTION|Configured API|VITE_API_BASE_URL|synthetic|fixture|prototype|localhost|127\.0\.0\.1/)
+  await expect(page.getByRole('link', { name: 'Create an account' })).toHaveAttribute('href', '/register')
+  for (const width of [320, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+    const heading = await page.locator('h1').boundingBox()
+    expect(heading!.x).toBeGreaterThanOrEqual(0)
+    expect(heading!.x + heading!.width).toBeLessThanOrEqual(width)
+    expect(heading!.height).toBeLessThan(100)
+    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([])
+    await page.screenshot({ path: `.local/login-${width}.png`, fullPage: true })
+  }
+  await page.getByLabel('Email address', { exact: true }).fill(fixture.users.client_a.email)
+  await page.getByLabel('Password', { exact: true }).fill('deliberately-incorrect-synthetic-input')
+  const rejected = page.waitForResponse(r => r.url().endsWith('/auth/login'))
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  expect((await rejected).status()).toBe(401)
+  await expect(page.getByRole('alert')).toContainText('The email or password is incorrect')
+  await expect(page.getByRole('heading', { name: 'Signed-in profile' })).toHaveCount(0)
+  await page.context().setOffline(true)
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('Sign-in is temporarily unavailable')
+  await expect(page.getByRole('heading', { name: 'Signed-in profile' })).toHaveCount(0)
+  await page.context().setOffline(false)
+  await page.locator('input[name="password"]').evaluate((input, password) => {
+    (input as HTMLInputElement).value = password
+  }, fixture.users.client_a.password)
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Signed-in profile' })).toBeVisible()
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
+  await page.context().close()
+})
+
 async function signIn(browser: Browser, role: string) {
   const page = await browser.newPage({ baseURL: 'http://127.0.0.1:5174' })
   await page.goto('/connect')
-  await page.getByRole('button', { name: 'Use API mode', exact: true }).click()
   await page.getByLabel('Email address', { exact: true }).fill(fixture.users[role].email)
   // No traces, videos, screenshots or credential-bearing fill action logs.
   await page.locator('input[name="password"]').evaluate((input, password) => {

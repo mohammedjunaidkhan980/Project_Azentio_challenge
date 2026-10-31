@@ -46,7 +46,6 @@ async function contractBackend(page: Page, role = 'client', unsafeShared = false
 }
 async function connect(page: Page, signIn = true) {
   await page.goto('/connect')
-  await page.getByRole('button', { name: 'Use API mode' }).click()
   if (signIn) {
     await page.getByLabel('Email address', { exact: true }).fill('synthetic@example.com')
     await page.getByLabel('Password', { exact: true }).fill('synthetic-test-only')
@@ -159,8 +158,10 @@ test('contract mock: owner improvement transitions and evidence-linked creation'
 test('contract mock: connection failure is explicit and API login reflows accessibly', async ({ page }) => {
   await page.route('**/api/v1/**', route => route.abort('connectionrefused'))
   await connect(page, false)
-  await page.getByRole('button', { name: 'Check API health' }).click()
-  await expect(page.getByRole('alert')).toContainText('No demo data was substituted')
+  await page.getByLabel('Email address', { exact: true }).fill('synthetic@example.com')
+  await page.getByLabel('Password', { exact: true }).fill('nonfunctional-test-input')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('Sign-in is temporarily unavailable')
   await page.setViewportSize({ width: 360, height: 800 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
   expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([])
@@ -211,11 +212,11 @@ test('contract mock: admin operations use the documented management endpoints', 
 test('contract mock: reload keeps API mode but clears credentials; sign-out does not call an invented endpoint', async ({ page }) => {
   const calls = await contractBackend(page)
   await connect(page)
-  await page.getByRole('button', { name: 'Sign out locally', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Sign in to the API' })).toBeVisible()
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
   expect(calls.some(c => c.path.includes('logout'))).toBe(false)
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Sign in to the API' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
   await expect(page.locator('header').getByRole('link', { name: 'Client workspace' })).toBeVisible()
   await expect(page.locator('.demo-banner')).toHaveCount(0)
 })

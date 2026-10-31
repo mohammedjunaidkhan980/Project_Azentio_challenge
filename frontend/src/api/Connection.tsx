@@ -1,13 +1,45 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { api, object, text } from './client'
-import { services } from './services'
+import { ApiError } from './client'
 import { useSession } from './session'
-import { ApiForm, Field } from './Ui'
-import { Notice, PageHeading } from '../components/ui'
+import { Notice } from '../components/ui'
+
 export function Connection() {
   const { mode, setMode, user, login, logout } = useSession()
-  const [health, setHealth] = useState(''), [error, setError] = useState(''), [checking, setChecking] = useState(false)
-  async function check() { setChecking(true); setError(''); try { const r = await services.health(); setHealth(text(object(r.data).status) || 'API acknowledged health request') } catch (e) { setError((e as Error).message) } finally { setChecking(false) } }
-  return <div className="container section"><PageHeading eyebrow="API CONNECTION" title="Connect to your organisation’s workspace." description="Use a synthetic test account. No backend is bundled; API mode sends real HTTP requests and never substitutes fixture data." /><div className="detail-layout"><div className="form-panel"><h2>Connection settings</h2><p className="body-copy">Configured API: <code className="api-url">{api.baseURL}</code></p><p className="disclaimer">Set VITE_API_BASE_URL in a local .env file and restart Vite to change the address. Tokens stay in memory; refresh signs you out.</p><div className="hero-actions"><button className="button button-secondary" disabled={checking} onClick={check}>{checking ? 'Checking…' : 'Check API health'}</button><button className="button button-primary" onClick={() => setMode(mode === 'api' ? 'demo' : 'api')}>{mode === 'api' ? 'Return to fixture demo' : 'Use API mode'}</button></div>{health && <Notice>Health response: {health}</Notice>}{error && <Notice error>{error}</Notice>}<p className="disclaimer">API documentation describes password/JWT login. Managed identity, server logout/revocation and separate grants still need backend confirmation; this connection is not a production-security certification.</p></div>{mode === 'api' ? user ? <div className="form-panel"><h2>Signed-in profile</h2><p>{user.full_name}</p><p>{user.email}</p><p>Active memberships: {user.memberships.length}</p><Link className="button button-primary" to="/workspace">Open workspace</Link><button className="button button-secondary mt-4" onClick={logout}>Sign out locally</button><p className="disclaimer">Local sign-out clears browser memory. The documented backend has no logout/revocation endpoint; issued tokens may remain valid until expiry.</p></div> : <ApiForm label="Sign in" onSave={async data => { await login(String(data.get('email')), String(data.get('password'))) }}><h2>Sign in to the API</h2><Link className="inline-link" to="/register">Register a test account</Link><Field name="email" label="Email address" type="email" maxLength={255} /><Field name="password" label="Password" type="password" /><p className="disclaimer">Only an API-confirmed active, verified user may enter. No invitation/verification bypass is implemented.</p></ApiForm> : <div className="form-panel"><h2>Fixture demonstration remains available.</h2><p className="body-copy">The existing synthetic walkthrough is unchanged. Choose API mode to use the documented backend integration.</p><Link className="button button-secondary" to="/workspace">Open fixture workspace</Link></div>}</div></div>
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => { if (mode !== 'api') setMode('api') }, [mode, setMode])
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (pending) return
+    const data = new FormData(event.currentTarget)
+    setPending(true)
+    setError('')
+    try { await login(String(data.get('email')).trim(), String(data.get('password'))) }
+    catch (cause) {
+      const failure = cause instanceof ApiError ? cause : null
+      setError(failure?.status === 401 ? 'The email or password is incorrect. Please try again.'
+        : failure?.status === 403 ? 'Your account needs approval or access to this workspace. Please contact your administrator.'
+        : failure?.status === 422 ? 'Check your email address and password, then try again.'
+        : 'Sign-in is temporarily unavailable. Please try again shortly.')
+    } finally { setPending(false) }
+  }
+
+  return <div className="container login-page"><section className="login-card" aria-labelledby="login-title">
+    <p className="eyebrow">AZENTIO.AI</p>
+    <h1 id="login-title">{user ? 'Your workspace' : 'Welcome back'}</h1>
+    <p className="login-intro">{user ? 'You are signed in to your organisation’s workspace.' : "Sign in to access your organisation's workspace."}</p>
+    {user ? <div className="login-profile"><h2>Signed-in profile</h2><p>{user.full_name}</p><p>{user.email}</p>
+      <Link className="button button-primary" to="/workspace">Open workspace</Link>
+      <button className="button button-secondary" onClick={logout}>Sign out</button>
+    </div> : <form onSubmit={submit} aria-label="Sign in" aria-busy={pending}>
+      <div className="field"><label htmlFor="login-email">Email address</label><input id="login-email" name="email" type="email" autoComplete="username" required maxLength={255} /></div>
+      <div className="field"><label htmlFor="login-password">Password</label><input id="login-password" name="password" type="password" autoComplete="current-password" required /></div>
+      {error && <Notice error>{error}</Notice>}
+      <button className="button button-primary login-submit" type="submit" disabled={pending}>{pending ? 'Signing in…' : 'Sign in'}</button>
+      <p className="login-register">New to Azentio.ai? <Link to="/register">Create an account</Link></p>
+    </form>}
+  </section></div>
 }
