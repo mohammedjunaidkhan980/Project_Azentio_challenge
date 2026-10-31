@@ -40,12 +40,13 @@ def run(path: Path, cleanup: bool):
                 if obs["consent_status"] == "granted":
                     call("DELETE", "/observations/" + item["id"] + "/consent", item["role"], {"reason": "Synthetic test cleanup"})
             assert call("GET", "/learning-themes?product_id=" + f["last_theme_journey"]["product_id"], "client_a") == []
+            call("DELETE", "/products/" + f["last_theme_journey"]["product_id"], "admin")
             print("PASS theme fixtures withdrawn and suppressed; no mock data or tokens persisted")
             return
 
         suffix = uuid.uuid4().hex[:10]
         product = call("POST", "/products", "admin", {"name": "SYNTHETIC Theme " + suffix,
-            "slug": "synthetic-theme-" + suffix, "is_published": True}, expected=201)["id"]
+            "slug": "synthetic-theme-" + suffix, "is_published": False}, expected=201)["id"]
         call("POST", "/product-improvements", "owner", {"title": "Not entitled",
             "description": "Synthetic permission denial", "product_id": product,
             "organisation_id": f["organisations"]["a"]}, expected=403)
