@@ -117,6 +117,8 @@ class ObservationService:
         observation = await self._repo.get_by_id(observation_id)
         if not observation or observation.organisation_id not in self._client_org_ids(user):
             raise _not_found()
+        if observation.created_by_user_id != user.id:
+            raise _forbidden()
         if observation.consent_status == ConsentStatusEnum.GRANTED:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -161,6 +163,8 @@ class ObservationService:
         observation = await self._repo.get_by_id(observation_id)
         if not observation or observation.organisation_id not in self._client_org_ids(user):
             raise _not_found()
+        if observation.created_by_user_id != user.id:
+            raise _forbidden()
         if observation.consent_status != ConsentStatusEnum.GRANTED:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

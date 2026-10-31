@@ -22,3 +22,5 @@ FIRST_PROMPT.md
 SECOND_PROMPT.md
 FIRST_STEP.md
 *.dump
+
+.local/
