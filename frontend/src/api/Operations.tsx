@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Portal } from '../components/Portal'
 import { Badge, EmptyState, PageHeading } from '../components/ui'
 import { object, records, text } from './client'
@@ -24,8 +24,15 @@ function Enquiries() {
   return <><h2>Demo enquiries</h2><Resource resource={resource}>{data => { const rows = records(data); return rows.length ? <div className="api-records">{rows.map(e => <article className="api-record" key={text(e.id)}><Badge>{text(e.status)}</Badge><h3>{text(e.organisation_name)}</h3><p>{text(e.product_interest)}</p><button className="button button-secondary" onClick={() => setSelected(text(e.id))}>Open enquiry</button></article>)}</div> : <EmptyState title="No enquiries returned">This page contains no permitted enquiries.</EmptyState> }}</Resource><Pagination page={page} setPage={setPage} response={resource.response} />{selected && <EnquiryDetail key={selected} id={selected} refresh={resource.reload} />}</>
 }
 function EnquiryDetail({ id, refresh }: { id: string; refresh: () => void }) {
+  const panel = useRef<HTMLDivElement>(null)
   const resource = useResource(useCallback((signal: AbortSignal) => services.enquiry(id, signal), [id]))
-  return <Resource resource={resource}>{data => { const e = object(data); return <div className="api-record mt-6"><h2>Enquiry detail</h2><p>{text(e.name)} · {text(e.work_email)}</p><p>{text(e.requirements)}</p><ApiForm successMessage="Changes saved." label="Update enquiry status" onSave={data => services.enquiryStatus(id, value(data, 'status'))} onDone={() => { resource.reload(); refresh() }}><Field name="status" label="Enquiry status" value={text(e.status)}>{['new', 'in_review', 'responded', 'closed'].map(s => <option key={s} value={s}>{s.replaceAll('_', ' ')}</option>)}</Field><p className="disclaimer">Changes are saved after the selected status is confirmed.</p></ApiForm></div> }}</Resource>
+  useEffect(() => {
+    if (!resource.loading && resource.response) {
+      panel.current?.scrollIntoView({ block: 'start' })
+      panel.current?.focus({ preventScroll: true })
+    }
+  }, [resource.loading, resource.response])
+  return <Resource resource={resource}>{data => { const e = object(data); return <div className="api-record mt-6" ref={panel} tabIndex={-1} aria-label="Enquiry details"><h2>Enquiry detail</h2><p>{text(e.name)} · {text(e.work_email)}</p><p>{text(e.requirements)}</p><ApiForm successMessage="Changes saved." label="Update enquiry status" onSave={data => services.enquiryStatus(id, value(data, 'status'))} onDone={() => { resource.reload(); refresh() }}><Field name="status" label="Enquiry status" value={text(e.status)}>{['new', 'in_review', 'responded', 'closed'].map(s => <option key={s} value={s}>{s.replaceAll('_', ' ')}</option>)}</Field><p className="disclaimer">Changes are saved after the selected status is confirmed.</p></ApiForm></div> }}</Resource>
 }
 function Audit() {
   const [page, setPage] = useState(1)

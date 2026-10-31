@@ -127,13 +127,13 @@ tests/
 
 The backend includes moderation, explicit publication, organisation product entitlements, shared learning, product improvements, evidence links, and audit retrieval.
 
-- Moderation and publication require moderator or administrator membership.
+- Observation review and shared-copy publication require moderator membership; portal admin does not imply moderator access.
 - Entitlement management requires administrator membership.
-- Product improvements require administrator or product-owner membership.
+- Improvement writes require a product-owner membership in an entitled organisation; client reads are organisation-scoped. Portal admin does not imply owner access.
 - Consent withdrawal atomically unpublishes associated shared-learning entries.
 - Audit listing is restricted to moderators and administrators.
 
-See [docs/phase4_api_documentation.md](docs/phase4_api_documentation.md) for endpoint contracts and authorization rules.
+The running FastAPI /docs endpoint exposes the current API schema. See the explicit catalogue-grant section below for product marketing permissions, which are separate from observation moderation.
 
 ---
 
@@ -295,3 +295,75 @@ admin-management.spec.ts` from frontend. Then `python -m scripts.check_admin_aud
 from the root performs a read-only MySQL audit/restoration check. Live traces and
 videos stay disabled. Browser contract mocks remain separately labelled and do not
 prove live integration. Full Challenge 7 scope and production IAM remain incomplete.
+
+
+## Presentation rehearsal (real UI and MySQL)
+
+The opt-in `frontend/e2e-live/presentation.spec.ts` clicks the running React UI
+using real synthetic development accounts. It does not intercept API requests or
+seed journey records through direct API calls. It exercises observation creation,
+explicit consent, moderator redaction/approval/publication, a second organisation's
+approved-only access, evidence-linked improvement/status, withdrawal, Admin Manage
+User and the existing preloaded fallback records. `scripts/verify_presentation_records.py`
+performs read-only assertions against the loopback development MySQL database after
+each lifecycle stage. Do not run this rehearsal with production/customer accounts.
+
+Prepare the private synthetic presentation manifest outside Git, the existing local
+React/FastAPI/MySQL stack and preloaded demo records. Set
+`AZENTIO_PRESENTATION_CREDENTIALS` to that private manifest. From frontend run:
+
+```
+npx playwright test --config playwright.live.config.ts presentation.spec.ts --grep rehearsal
+```
+
+Password-free results, HTTP method/path/status evidence and screenshots are saved
+under ignored `frontend/.local/presentation-verification/<timestamp>/`. Authentication
+traces and videos are disabled; capture waits for the page's data to render. Failed
+runs capture screenshots after clearing any password inputs. Do not commit these
+local artifacts or the private manifest. The original remains organisation-visible;
+this does not claim an author-private draft. The final journey is deliberately
+withdrawn; use the separately verified preloaded approved records for a live backup.
+
+A separate, explicitly opt-in fixture repair check (`AZENTIO_PRESENTATION_REPAIR=1`)
+restores only the known fictional support client's intended client membership through
+the Admin UI. It is not a generic account migration or an automatic permission reset.
+`AZENTIO_PRESENTATION_RESUME` optionally points to the local results JSON when resuming
+a rehearsal paused after publication and before creating the improvement. Normal runs
+create a fresh fictional observation. The full Challenge 7 scope is not implied by
+one passing presentation journey.
+
+
+## Autonomous live website audit
+
+`frontend/e2e-live/website-audit.spec.ts` exercises all seven synthetic demo identities,
+visible workspace navigation, public catalogue search/demo enquiries, employee enquiry
+status progression, registration approval denial, actual offline/retry behaviour,
+forbidden API access, expired access-token rejection, server-ended session handling,
+withdrawn-evidence boundaries and browser-console checks. It never intercepts success
+responses. `scripts/verify_website_audit.py` reads the loopback MySQL development schema
+to verify browser-created enquiries and unverified registrations. The disposable
+registration password exists only in memory and is not included in reports.
+
+Set the existing private `AZENTIO_PRESENTATION_CREDENTIALS` manifest and, for the
+server-ended disposable-client case, `AZENTIO_DEMO_CREDENTIALS`. Set
+`AZENTIO_QA_RUN` to a local artifact subdirectory. Run from frontend:
+
+```
+npx playwright test --config playwright.live.config.ts website-audit.spec.ts
+```
+
+For the exact document-verification feedback journey, set
+`AZENTIO_QA_BUSINESS_CASE=document-verification` and run the presentation rehearsal.
+Set `AZENTIO_QA_BUSINESS_RESULT` to its local results JSON before running the business
+privacy/republication cases. These cases use only the IDs from that completed real
+journey. The feedback's business impact, suggestion and question are recorded in the
+supported description field; no unsupported draft, edit, priority or chatbot is invented.
+The signed-expired-token fixture deliberately refuses non-loopback/non-development
+configuration and can emit only an already-expired credential. Its output is captured
+in memory by the negative test; never log or save that output.
+
+Artifacts remain under ignored `.local/` directories. Personal test reports and
+screenshots stay local. Do not run mutable admin and session tests concurrently against
+the same disposable account. No production users, resets, authentication bypass or
+blanket publishing grants are used. Customer workflow text is professional and honest
+about unsupported functions; enquiry detail scrolling/focus follows actual server load.

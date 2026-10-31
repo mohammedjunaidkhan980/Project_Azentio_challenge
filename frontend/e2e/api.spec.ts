@@ -74,8 +74,8 @@ test('contract mock: API catalogue pagination and documented enquiry payload', a
   await page.getByLabel('Product interest').fill('Analysis')
   await page.getByLabel('Requirements (10–5000 characters)').fill('Synthetic test requirements.')
   await page.getByRole('checkbox').check()
-  await page.getByRole('button', { name: 'Submit enquiry to API' }).click()
-  await expect(page.getByRole('status')).toContainText('API acknowledged')
+  await page.getByRole('button', { name: 'Submit enquiry' }).click()
+  await expect(page.getByRole('status')).toContainText('Your demo request has been received.')
   const call = calls.find(c => c.path === '/demo-enquiries' && c.method === 'POST')!
   expect(call.body).toMatchObject({ work_email: 'synthetic@example.com', product_id: productId, requirements: 'Synthetic test requirements.' })
   expect(call.body).not.toHaveProperty('email')
@@ -116,7 +116,7 @@ test('contract mock: moderator approval and publication are separate calls', asy
   expect(calls.filter(c => c.path.endsWith('/publish'))).toHaveLength(0)
   await page.getByRole('checkbox', { name: /I confirm publication/ }).check()
   await page.getByRole('button', { name: 'Publish approved copy', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText('API acknowledged')
+  await expect(page.getByRole('status')).toContainText('Your request was completed.')
   expect(calls.some(c => c.path.endsWith('/publish') && c.method === 'POST')).toBe(true)
 })
 
