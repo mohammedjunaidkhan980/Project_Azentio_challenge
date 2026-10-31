@@ -24,3 +24,4 @@ FIRST_STEP.md
 *.dump
 
 .local/
+.venv312/
