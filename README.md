@@ -127,13 +127,13 @@ tests/
 
 The backend includes moderation, explicit publication, organisation product entitlements, shared learning, product improvements, evidence links, and audit retrieval.
 
-- Moderation and publication require moderator or administrator membership.
+- Observation review and shared-copy publication require moderator membership; portal admin does not imply moderator access.
 - Entitlement management requires administrator membership.
-- Product improvements require administrator or product-owner membership.
+- Improvement writes require a product-owner membership in an entitled organisation; client reads are organisation-scoped. Portal admin does not imply owner access.
 - Consent withdrawal atomically unpublishes associated shared-learning entries.
 - Audit listing is restricted to moderators and administrators.
 
-See [docs/phase4_api_documentation.md](docs/phase4_api_documentation.md) for endpoint contracts and authorization rules.
+The running FastAPI /docs endpoint exposes the current API schema. See the explicit catalogue-grant section below for product marketing permissions, which are separate from observation moderation.
 
 ---
 
@@ -331,3 +331,39 @@ the Admin UI. It is not a generic account migration or an automatic permission r
 a rehearsal paused after publication and before creating the improvement. Normal runs
 create a fresh fictional observation. The full Challenge 7 scope is not implied by
 one passing presentation journey.
+
+
+## Autonomous live website audit
+
+`frontend/e2e-live/website-audit.spec.ts` exercises all seven synthetic demo identities,
+visible workspace navigation, public catalogue search/demo enquiries, employee enquiry
+status progression, registration approval denial, actual offline/retry behaviour,
+forbidden API access, expired access-token rejection, server-ended session handling,
+withdrawn-evidence boundaries and browser-console checks. It never intercepts success
+responses. `scripts/verify_website_audit.py` reads the loopback MySQL development schema
+to verify browser-created enquiries and unverified registrations. The disposable
+registration password exists only in memory and is not included in reports.
+
+Set the existing private `AZENTIO_PRESENTATION_CREDENTIALS` manifest and, for the
+server-ended disposable-client case, `AZENTIO_DEMO_CREDENTIALS`. Set
+`AZENTIO_QA_RUN` to a local artifact subdirectory. Run from frontend:
+
+```
+npx playwright test --config playwright.live.config.ts website-audit.spec.ts
+```
+
+For the exact document-verification feedback journey, set
+`AZENTIO_QA_BUSINESS_CASE=document-verification` and run the presentation rehearsal.
+Set `AZENTIO_QA_BUSINESS_RESULT` to its local results JSON before running the business
+privacy/republication cases. These cases use only the IDs from that completed real
+journey. The feedback's business impact, suggestion and question are recorded in the
+supported description field; no unsupported draft, edit, priority or chatbot is invented.
+The signed-expired-token fixture deliberately refuses non-loopback/non-development
+configuration and can emit only an already-expired credential. Its output is captured
+in memory by the negative test; never log or save that output.
+
+Artifacts remain under ignored `.local/` directories. Personal test reports and
+screenshots stay local. Do not run mutable admin and session tests concurrently against
+the same disposable account. No production users, resets, authentication bypass or
+blanket publishing grants are used. Customer workflow text is professional and honest
+about unsupported functions; enquiry detail scrolling/focus follows actual server load.

@@ -35,7 +35,7 @@ export function ApiForm({ children, label, onSave, onDone, successMessage }: { c
     catch (e) { setError((e as Error).message) }
     finally { setPending(false) }
   }
-  return <form className="form-panel api-form" onSubmit={submit}>{children}{error && <Notice error>{error}</Notice>}{success && <Notice>{successMessage ?? 'The API acknowledged this action. Refresh the relevant view to see its current state.'}</Notice>}<button type="submit" className="button button-primary mt-6" disabled={pending}>{pending ? 'Sending request…' : label}</button></form>
+  return <form className="form-panel api-form" onSubmit={submit}>{children}{error && <Notice error>{error}</Notice>}{success && <Notice>{successMessage ?? 'Your request was completed.'}</Notice>}<button type="submit" className="button button-primary mt-6" disabled={pending}>{pending ? 'Sending request…' : label}</button></form>
 }
 export function Acknowledgement({ name, children }: { name: string; children: ReactNode }) { return <label className="checkbox-label"><input type="checkbox" name={name} required />{children}</label> }
 export class ApiBoundary extends Component<{ children: ReactNode; routeKey?: string }, { error: string }> {

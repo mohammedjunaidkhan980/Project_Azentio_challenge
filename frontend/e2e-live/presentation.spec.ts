@@ -41,9 +41,11 @@ test('REAL presentation rehearsal with screenshots and direct MySQL evidence', a
   const report: { name: string; status: string; url: string; screenshot: string; detail: string }[] = resume ? resume.report.filter((r: { status: string }) => r.status === 'PASS') : []
   const http: { role: string; path: string; method: string; status: number }[] = []
   const pages: Page[] = [], ids = resume?.ids ?? { observation: '', shared: '', improvement: '' }
-  const stamp = resume?.created ?? new Date().toISOString(), title = resume?.title ?? 'Seasonal portfolio comparison — presentation ' + stamp
-  const approvedTitle = resume?.approvedTitle ?? 'Seasonal portfolio comparison: reviewed insight ' + stamp
-  const improvementTitle = resume?.improvementTitle ?? 'Add seasonal comparison guidance — presentation ' + stamp
+  const business = process.env.AZENTIO_QA_BUSINESS_CASE === 'document-verification'
+  const description = business ? 'FICTIONAL PRIVATE: Fictional Harbour Bank feedback. Problem description: Our loan operations team is spending too much time manually verifying documents. Each application requires repeated checks, increasing processing time and creating delays for customers. Business impact: Loan processing is delayed, employees spend additional time on verification, and customers experience longer waiting periods. Suggested improvement: Introduce automated document validation with human review for exceptional cases. Question: Can Azentio introduce a document verification workflow that reduces repetitive manual checks while maintaining human approval for exceptions?' : 'FICTIONAL PRIVATE: Harbour branch H-17; fictitious analyst Morgan Lee; sample portfolio variance 18%. Compare seasonal quarters before escalating. All details are invented for this demonstration.'
+  const stamp = resume?.created ?? new Date().toISOString(), title = resume?.title ?? (business ? 'Manual Loan Verification Delays' : 'Seasonal portfolio comparison — presentation ' + stamp)
+  const approvedTitle = resume?.approvedTitle ?? (business ? 'Reducing Manual Document Verification Delays' : 'Seasonal portfolio comparison: reviewed insight ' + stamp)
+  const improvementTitle = resume?.improvementTitle ?? (business ? 'Automated Document Verification Workflow' : 'Add seasonal comparison guidance — presentation ' + stamp)
   let current = 'Client sign-in'
   async function capture(page: Page, name: string, detail = '') {
     await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
@@ -83,18 +85,25 @@ test('REAL presentation rehearsal with screenshots and direct MySQL evidence', a
     if (!resume) {
     await expect(client.getByRole('heading', { name: 'Your organisation’s observations.' })).toBeVisible()
     await capture(client, '1 Client sign-in', fixture.users.client.email)
+    if (business) {
+      await client.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'AI offerings', exact: true }).click()
+      await client.getByRole('link', { name: 'Explore offering: Financial Analysis Intelligence', exact: true }).click()
+      await expect(client.getByRole('heading', { name: 'Financial Analysis Intelligence', exact: true })).toBeVisible()
+      await capture(client, 'Selected an existing entitled catalogue offering')
+      await client.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Client workspace', exact: true }).click()
+    }
     current = 'Create observation'
     await client.getByRole('link', { name: 'New observation', exact: true }).click()
     await client.getByLabel('Title', { exact: true }).fill(title)
-    await client.getByLabel('Observation (10–10000 characters)').fill('FICTIONAL PRIVATE: Harbour branch H-17; fictitious analyst Morgan Lee; sample portfolio variance 18%. Compare seasonal quarters before escalating. All details are invented for this demonstration.')
+    await client.getByLabel('Observation (10–10000 characters)').fill(description)
     await client.getByLabel('Product ID').fill(fixture.product_id)
-    await client.getByLabel('Category').fill('Seasonality')
+    await client.getByLabel('Category').fill(business ? 'Document verification' : 'Seasonality')
     await client.getByRole('checkbox').check()
     const creation = client.waitForResponse(r => r.url().endsWith('/api/v1/observations') && r.request().method() === 'POST')
     await client.getByRole('button', { name: 'Create organisation observation', exact: true }).click()
     const created = await creation; expect(created.status()).toBe(201)
     ids.observation = (await created.json()).data.id
-    await client.locator('article').filter({ has: client.getByRole('heading', { name: title, exact: true }) }).getByRole('link').click()
+    await client.locator(`a[href="/observations/${ids.observation}"]`).click()
     await expect(client.getByText('Sharing consent: not_granted', { exact: true })).toBeVisible()
     await capture(client, '2 Observation submitted without sharing consent', 'HTTP201; original is organisation-visible, not an author-private draft.')
     database('created')
@@ -105,11 +114,11 @@ test('REAL presentation rehearsal with screenshots and direct MySQL evidence', a
     await capture(client, '4 Explicit sharing consent'); database('granted')
     current = 'Moderator review and publication'
     const moderator = await signIn('moderator')
-    await moderator.locator('article').filter({ has: moderator.getByRole('heading', { name: title, exact: true }) }).getByRole('link').click()
+    await moderator.locator(`a[href="/review/${ids.observation}"]`).click()
     await expect(moderator.getByText(/FICTIONAL PRIVATE:/)).toBeVisible()
     await moderator.getByLabel('Decision reason').fill('Fictional privacy review: removed branch code, organisation attribution, analyst identity and exact private variance.')
     await moderator.getByLabel('Reviewed title (required for approval)').fill(approvedTitle)
-    await moderator.getByLabel('Reviewed body (required for approval)').fill('A financial-services team found that quarter-on-quarter portfolio changes need seasonal context before escalation. Compare equivalent reporting periods and explain material differences before drawing conclusions. This is a fictional demonstration insight.')
+    await moderator.getByLabel('Reviewed body (required for approval)').fill(business ? 'Financial institutions can experience operational delays when document verification involves repetitive manual checks. Automated document validation with human review for exceptions may help improve processing efficiency.' : 'A financial-services team found that quarter-on-quarter portfolio changes need seasonal context before escalation. Compare equivalent reporting periods and explain material differences before drawing conclusions. This is a fictional demonstration insight.')
     await capture(moderator, '5–6 Moderator reviews and explicitly redacts the original')
     const review = moderator.getByRole('button', { name: 'Record moderation decision', exact: true }).locator('..')
     await review.getByRole('checkbox').check(); await review.getByRole('button').click()
@@ -122,7 +131,17 @@ test('REAL presentation rehearsal with screenshots and direct MySQL evidence', a
     await capture(moderator, '6 Approved copy published', 'Approval and publication are separate confirmed UI actions.'); database('published')
     } else { database('published') }
     current = 'Authorised second client and private-original denial'
-    const reader = await signIn('summit'); await search(reader, approvedTitle)
+    const reader = await signIn('summit')
+    if (business) {
+      for (const query of ['Document verification', 'Loan processing', 'Manual checks', 'FICTIONAL PRIVATE']) {
+        await search(reader, query)
+        const expected = !['Loan processing', 'FICTIONAL PRIVATE'].includes(query)
+        if (expected) await expect(reader.getByRole('heading', { name: approvedTitle, exact: true })).toBeVisible()
+        else await expect(reader.getByRole('heading', { name: approvedTitle, exact: true })).toHaveCount(0)
+        await capture(reader, 'Business search: ' + query, expected ? 'Approved matching insight visible.' : 'No exact approved-text match; private text and semantic inference are not returned.')
+      }
+    }
+    await search(reader, approvedTitle)
     await reader.getByRole('link', { name: 'View approved contribution', exact: true }).click()
     await expect(reader).toHaveURL(new RegExp('/learning/' + ids.shared + '$'))
     await expect(reader.getByRole('heading', { name: approvedTitle, exact: true })).toBeVisible()
@@ -136,7 +155,7 @@ test('REAL presentation rehearsal with screenshots and direct MySQL evidence', a
     current = 'Product owner improvement'
     const owner = await signIn('owner')
     await owner.getByLabel('Improvement title').fill(improvementTitle)
-    await owner.getByLabel('Problem and proposed outcome').fill('Provide an equivalent-period comparison option and clear seasonal context in portfolio review guidance, supported only by the approved insight.')
+    await owner.getByLabel('Problem and proposed outcome').fill(business ? 'Explore automated document validation to reduce repetitive verification work while retaining human review for exceptions. Business objective: Improve the efficiency of the loan application review process.' : 'Provide an equivalent-period comparison option and clear seasonal context in portfolio review guidance, supported only by the approved insight.')
     await owner.getByLabel('Product UUID').fill(fixture.product_id)
     await owner.getByLabel('Approved shared-entry UUIDs (comma-separated)').fill(ids.shared)
     await owner.getByRole('checkbox').check()
@@ -155,7 +174,7 @@ test('REAL presentation rehearsal with screenshots and direct MySQL evidence', a
     await capture(client, '10 Client sees the improvement status')
     current = 'Consent withdrawal and access invalidation'
     await client.getByRole('link', { name: 'Client dashboard', exact: true }).click()
-    await client.locator('article').filter({ has: client.getByRole('heading', { name: title, exact: true }) }).getByRole('link').click()
+    await client.locator(`a[href="/observations/${ids.observation}"]`).click()
     await client.getByRole('checkbox').check(); const start = Date.now()
     await client.getByRole('button', { name: 'Withdraw sharing consent', exact: true }).click()
     await expect(client.getByText('Sharing consent: withdrawn', { exact: true })).toBeVisible()
