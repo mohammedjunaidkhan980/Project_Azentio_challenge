@@ -295,3 +295,39 @@ admin-management.spec.ts` from frontend. Then `python -m scripts.check_admin_aud
 from the root performs a read-only MySQL audit/restoration check. Live traces and
 videos stay disabled. Browser contract mocks remain separately labelled and do not
 prove live integration. Full Challenge 7 scope and production IAM remain incomplete.
+
+
+## Presentation rehearsal (real UI and MySQL)
+
+The opt-in `frontend/e2e-live/presentation.spec.ts` clicks the running React UI
+using real synthetic development accounts. It does not intercept API requests or
+seed journey records through direct API calls. It exercises observation creation,
+explicit consent, moderator redaction/approval/publication, a second organisation's
+approved-only access, evidence-linked improvement/status, withdrawal, Admin Manage
+User and the existing preloaded fallback records. `scripts/verify_presentation_records.py`
+performs read-only assertions against the loopback development MySQL database after
+each lifecycle stage. Do not run this rehearsal with production/customer accounts.
+
+Prepare the private synthetic presentation manifest outside Git, the existing local
+React/FastAPI/MySQL stack and preloaded demo records. Set
+`AZENTIO_PRESENTATION_CREDENTIALS` to that private manifest. From frontend run:
+
+```
+npx playwright test --config playwright.live.config.ts presentation.spec.ts --grep rehearsal
+```
+
+Password-free results, HTTP method/path/status evidence and screenshots are saved
+under ignored `frontend/.local/presentation-verification/<timestamp>/`. Authentication
+traces and videos are disabled; capture waits for the page's data to render. Failed
+runs capture screenshots after clearing any password inputs. Do not commit these
+local artifacts or the private manifest. The original remains organisation-visible;
+this does not claim an author-private draft. The final journey is deliberately
+withdrawn; use the separately verified preloaded approved records for a live backup.
+
+A separate, explicitly opt-in fixture repair check (`AZENTIO_PRESENTATION_REPAIR=1`)
+restores only the known fictional support client's intended client membership through
+the Admin UI. It is not a generic account migration or an automatic permission reset.
+`AZENTIO_PRESENTATION_RESUME` optionally points to the local results JSON when resuming
+a rehearsal paused after publication and before creating the improvement. Normal runs
+create a fresh fictional observation. The full Challenge 7 scope is not implied by
+one passing presentation journey.
