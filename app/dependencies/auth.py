@@ -43,6 +43,8 @@ async def get_current_user(
     user = await UserRepository(db).get_by_id(user_id)
     if not user or not user.is_active:
         raise _AUTH_ERROR
+    if not user.is_verified:
+        raise _FORBIDDEN
     return user
 
 
@@ -50,7 +52,7 @@ def require_roles(*roles: RoleEnum):
     """Returns a dependency that checks the user holds at least one of the given roles in any active membership."""
 
     async def _check(user: Annotated[User, Depends(get_current_user)]) -> User:
-        user_roles = {m.role for m in user.memberships if m.is_active}
+        user_roles = {m.role for m in user.memberships if m.is_active and m.organisation is not None and m.organisation.is_active}
         if not user_roles.intersection(roles):
             raise _FORBIDDEN
         return user

@@ -63,6 +63,7 @@ test('long synthetic text remains text, reflows, and is reset on reload', async 
   await page.getByLabel('What did you observe?').fill('<script>alert("synthetic")</script>' + 'Y'.repeat(500))
   await page.getByRole('checkbox', { name: /I allow this synthetic/ }).check()
   await page.getByRole('button', { name: 'Save draft' }).click()
+  await expect(page.getByRole('status')).toContainText('Draft saved in this preview')
   await page.setViewportSize({ width: 320, height: 800 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
   await page.getByRole('link', { name: /My observations/ }).click()

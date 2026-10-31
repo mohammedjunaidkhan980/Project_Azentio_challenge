@@ -84,9 +84,16 @@ async def list_shared_learning(
     product_id: uuid.UUID | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    q: str = Query("", max_length=200),
 ):
-    items, meta = await Phase4Service(db).list_shared(user, product_id, page, page_size)
+    items, meta = await Phase4Service(db).list_shared(user, product_id, page, page_size, q)
     return SuccessResponse(message="Shared learning retrieved", data=items, meta=meta.model_dump())
+
+
+@router.get("/learning-themes", response_model=SuccessResponse[list[dict]])
+async def learning_themes(db: DbDep, user: UserDep, product_id: uuid.UUID | None = None):
+    themes = await Phase4Service(db).list_themes(user, product_id)
+    return SuccessResponse(message="Approved themes retrieved; unsafe cohorts suppressed", data=themes)
 
 
 @router.get("/shared-learning/{entry_id}", response_model=SuccessResponse[SharedLearningOut])

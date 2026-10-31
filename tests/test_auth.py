@@ -135,7 +135,7 @@ async def test_public_registration_duplicate_and_extra_fields(client: AsyncClien
 
 
 @pytest.mark.asyncio
-async def test_registered_user_can_login_without_membership(client: AsyncClient):
+async def test_unverified_registration_cannot_login(client: AsyncClient):
     registration = await client.post(
         "/api/v1/auth/register",
         json={"full_name": "No Org User", "email": "noorg@example.com", "password": "SecurePass123!"},
@@ -146,4 +146,4 @@ async def test_registered_user_can_login_without_membership(client: AsyncClient)
         "/api/v1/auth/login",
         json={"email": "noorg@example.com", "password": "SecurePass123!"},
     )
-    assert login.status_code == 200
+    assert login.status_code == 401

@@ -49,6 +49,13 @@ def _auth(user: User) -> dict:
     return {"Authorization": f"Bearer {create_access_token(str(user.id))}"}
 
 
+@pytest.mark.asyncio
+async def test_employee_has_no_implicit_publishing_permission(client: AsyncClient, db_session: AsyncSession):
+    user = await _seed_user_with_role(db_session, RoleEnum.EMPLOYEE)
+    response = await client.post("/api/v1/products", headers=_auth(user), json={"name": "Forbidden product"})
+    assert response.status_code == 403
+
+
 # ── Public listing ────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio

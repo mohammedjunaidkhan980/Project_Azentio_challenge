@@ -8,13 +8,13 @@ import { useResource } from './useResource'
 import { Access, Acknowledgement, ApiForm, Field, Pagination, Resource } from './Ui'
 import { value } from './forms'
 
-export function ApiReviewQueue() { return <Portal><Access roles={['moderator', 'admin']}><Queue /></Access></Portal> }
+export function ApiReviewQueue() { return <Portal><Access roles={['moderator']}><Queue /></Access></Portal> }
 function Queue() {
   const [page, setPage] = useState(1)
   const resource = useResource(useCallback((signal: AbortSignal) => services.queue(page, signal), [page]))
   return <><PageHeading eyebrow="MODERATION · API" title="Review proposed contributions." description="Only consent-granted proposals returned by the server belong in this queue. No private-draft lookup is performed." /><Resource resource={resource}>{data => { const rows = records(data); return rows.length ? <div className="api-records">{rows.map(o => <article className="api-record" key={text(o.id)}><Badge tone="amber">Submitted for review</Badge><h2 className="mt-6">{text(o.title)}</h2><p>{text(o.description)}</p><Link className="inline-link" to={`/review/${encodeURIComponent(text(o.id))}`}>Review proposal</Link></article>)}</div> : <EmptyState title="The review queue is clear">No eligible submissions were returned for this page.</EmptyState> }}</Resource><Pagination page={page} setPage={setPage} response={resource.response} /></>
 }
-export function ApiReviewDetail() { return <Portal><Access roles={['moderator', 'admin']}><Review /></Access></Portal> }
+export function ApiReviewDetail() { return <Portal><Access roles={['moderator']}><Review /></Access></Portal> }
 function Review() {
   const { id = '' } = useParams(), [page, setPage] = useState(1), [approved, setApproved] = useState(false)
   // No moderator-only detail endpoint is documented: obtain originals only from the authorised queue.

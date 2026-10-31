@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -11,6 +12,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     APP_ENV: str = "development"
     APP_DEBUG: bool = False
+    THEME_MIN_ORGANISATIONS: int = Field(default=3, ge=3)
 
 
 settings = Settings()

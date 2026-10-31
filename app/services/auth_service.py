@@ -22,7 +22,7 @@ class AuthService:
         user = await self._repo.get_by_email(email)
         if not user or not verify_password(password, user.hashed_password):
             raise _INVALID_CREDENTIALS
-        if not user.is_active:
+        if not user.is_active or not user.is_verified:
             raise _INVALID_CREDENTIALS
         user_id = str(user.id)
         return TokenResponse(

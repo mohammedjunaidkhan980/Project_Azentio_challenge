@@ -61,6 +61,28 @@ async function signIn(browser: Browser, role: string) {
   return page
 }
 
+test('REAL themes: safe evidence links and approved-only search', async ({ browser }) => {
+  test.skip(!fixture.last_theme_journey?.suffix, 'Run check_learning_themes before this dedicated browser test')
+  const page = await signIn(browser, 'client_a')
+  await page.getByRole('link', { name: 'Learning themes', exact: true }).click()
+  const card = page.locator('article').filter({ hasText: fixture.last_theme_journey.product_id })
+  await expect(card.getByRole('heading', { name: 'Seasonality context' })).toBeVisible()
+  await expect(card.getByText('3 contributing organisations', { exact: true })).toBeVisible()
+  await expect(card.getByText(/not market prevalence/)).toBeVisible()
+  await expect(card.getByRole('link')).toHaveCount(5)
+  await card.getByRole('link').first().click()
+  await expect(page.getByRole('heading', { name: 'Seasonality ' + fixture.last_theme_journey.suffix })).toBeVisible()
+  await expect(page.locator('main')).not.toContainText('PRIVATE-THEME-SOURCE')
+  await page.getByRole('link', { name: 'Approved learning', exact: true }).click()
+  await page.getByLabel('Search approved learning').fill(fixture.last_theme_journey.suffix)
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Seasonality ' + fixture.last_theme_journey.suffix })).toHaveCount(5)
+  await page.getByLabel('Search approved learning').fill('PRIVATE-THEME-SOURCE')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'No approved learning available' })).toBeVisible()
+  await page.context().close()
+})
+
 test('REAL HTTP/MySQL: browser author → consent → moderation → entitled learning → improvement → withdrawal', async ({ browser }) => {
   const author = await signIn(browser, 'client_a')
   const marker = 'SYNTHETIC Browser ' + Date.now()
@@ -101,9 +123,11 @@ test('REAL HTTP/MySQL: browser author → consent → moderation → entitled le
   await expect(reader.getByRole('heading', { name: marker + ' approved', exact: true })).toBeVisible()
   await expect(reader.getByText('PRIVATE-SOURCE', { exact: false })).toHaveCount(0)
   const other = await signIn(browser, 'client_c')
+  const thirdFeed = other.waitForResponse(r => r.url().includes('/api/v1/shared-learning?') && r.request().method() === 'GET')
   await other.getByRole('link', { name: 'Approved learning', exact: true }).click()
+  const thirdEntries = (await (await thirdFeed).json()).data as { id: string }[]
+  expect(thirdEntries.some(entry => entry.id === shared.id)).toBe(false)
   await expect(other.getByRole('heading', { name: marker + ' approved', exact: true })).toHaveCount(0)
-  await expect(other.getByRole('heading', { name: 'No approved learning available' })).toBeVisible()
 
   const owner = await signIn(browser, 'owner')
   await owner.getByRole('link', { name: 'Product improvements', exact: true }).click()

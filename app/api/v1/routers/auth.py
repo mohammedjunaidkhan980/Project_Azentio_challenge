@@ -56,7 +56,7 @@ async def refresh(body: RefreshRequest, db: Annotated[AsyncSession, Depends(get_
         raise _err
 
     user = await UserRepository(db).get_by_id(user_id)
-    if not user or not user.is_active:
+    if not user or not user.is_active or not user.is_verified:
         raise _err
 
     tokens = TokenResponse(
@@ -76,6 +76,7 @@ async def me(current_user: Annotated[User, Depends(get_current_user)]):
             is_active=m.is_active,
         )
         for m in current_user.memberships
+        if m.is_active and m.organisation is not None and m.organisation.is_active
     ]
     user_out = UserOut(
         id=current_user.id,

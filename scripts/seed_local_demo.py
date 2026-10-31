@@ -43,7 +43,8 @@ async def seed(path: Path):
             OrganisationMembership.role == RoleEnum.ADMIN).limit(1))
         for key, role, org_key in [("admin", RoleEnum.ADMIN, "a"), ("moderator", RoleEnum.MODERATOR, "a"),
                 ("owner", RoleEnum.PRODUCT_OWNER, "a"), ("client_a", RoleEnum.CLIENT, "a"),
-                ("peer_a", RoleEnum.CLIENT, "a"), ("client_b", RoleEnum.CLIENT, "b"),
+                ("peer_a", RoleEnum.CLIENT, "a"), ("employee", RoleEnum.EMPLOYEE, "a"),
+                ("owner_b", RoleEnum.PRODUCT_OWNER, "b"), ("client_b", RoleEnum.CLIENT, "b"),
                 ("client_c", RoleEnum.CLIENT, "c")]:
             email = key.replace("_", "-") + "@azentio-demo.example.com"
             user = await db.scalar(select(User).where(User.email == email))
