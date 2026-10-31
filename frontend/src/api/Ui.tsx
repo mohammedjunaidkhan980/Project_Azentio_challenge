@@ -1,18 +1,19 @@
 import { Component, useId, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
+import { signInPath } from './workspaceRoutes'
 import { EmptyState, Notice } from '../components/ui'
 import { useSession } from './session'
 import type { Envelope } from './client'
 export function Access({ roles, children }: { roles?: string[]; children: ReactNode }) {
   const { user, membership } = useSession()
-  if (!user) return <EmptyState headingLevel={1} title="Sign in to your API workspace" action={<Link className="button button-primary" to="/connect">Sign in</Link>}>No preview persona or local role grants API access.</EmptyState>
-  if (!membership) return <EmptyState headingLevel={1} title="Choose an active organisation">Select one of your active memberships above before continuing.</EmptyState>
-  if (roles && !roles.includes(membership.role)) return <EmptyState headingLevel={1} title="Access denied">This active membership does not have a documented role for this action. Server checks remain authoritative.</EmptyState>
+  const location = useLocation()
+  if (!user || !membership) return <Navigate to={signInPath(location)} replace />
+  if (roles && !roles.includes(membership.role)) return <EmptyState headingLevel={1} title="Access restricted" action={<Link className="button button-primary" to="/workspace">Return to your workspace</Link>}>Your current organisation membership does not include access to this page. Contact your administrator if you need access.</EmptyState>
   return children
 }
 export function Resource({ resource, children }: { resource: { loading: boolean; error: string; response: Envelope<unknown> | null; reload: () => void }; children: (data: unknown) => ReactNode }) {
-  if (resource.loading) return <div role="status" aria-busy="true" className="loading-panel">Loading from the configured API…</div>
+  if (resource.loading) return <div role="status" aria-busy="true" className="loading-panel">Loading your workspace…</div>
   if (resource.error) return <><Notice error>{resource.error}</Notice><button className="button button-secondary mt-4" onClick={resource.reload}>Retry request</button></>
   return resource.response ? children(resource.response.data) : null
 }

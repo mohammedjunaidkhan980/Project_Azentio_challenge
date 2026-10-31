@@ -26,7 +26,7 @@ describe('documented HTTP client contracts (mock transport, not live backend)', 
   it('does not retry unsafe writes on network failure and does not use fixtures', async () => {
     const fetcher = vi.fn<typeof fetch>().mockRejectedValue(new Error('offline'))
     const client = new ApiClient('https://api.example.test/api/v1', fetcher)
-    await expect(client.request('/demo-enquiries', { auth: false, method: 'POST', body: { name: 'Synthetic' } })).rejects.toThrow('No demo data was substituted')
+    await expect(client.request('/demo-enquiries', { auth: false, method: 'POST', body: { name: 'Synthetic' } })).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' })
     expect(fetcher).toHaveBeenCalledTimes(1)
   })
   it('clears the session after failed refresh and denies subsequent protected requests', async () => {

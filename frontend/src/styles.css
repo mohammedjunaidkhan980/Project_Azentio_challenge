@@ -411,3 +411,8 @@ input::placeholder, textarea::placeholder { color: #64748b; opacity: 1; }
 .login-register a { color: #1d4ed8; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .login-profile { display: grid; gap: 16px; overflow-wrap: anywhere; }
 .login-profile h2 { font-size: 20px; }
+
+.login-password { display: flex; flex-wrap: wrap; gap: 8px; }
+.login-password input { flex: 1 1 180px; }
+.login-password button { flex: 0 0 auto; }
+.login-card select { width: 100%; min-width: 0; }
